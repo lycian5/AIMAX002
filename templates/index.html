@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>중장비 관리 시스템</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --card: #22263a;
+    --border: #2e3350;
+    --accent: #f59e0b;
+    --accent2: #3b82f6;
+    --green: #10b981;
+    --red: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --radius: 10px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Pretendard', 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 260px; min-width: 260px; background: var(--surface);
+    border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
+  }
+  #sidebar-header { padding: 18px 16px 12px; border-bottom: 1px solid var(--border); }
+  #sidebar-header h1 { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
+  #sidebar-header p  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  #btn-add-eq {
+    margin: 12px 16px; padding: 8px; background: var(--accent); color: #000;
+    border: none; border-radius: var(--radius); cursor: pointer; font-weight: 700; font-size: 13px; width: calc(100% - 32px);
+  }
+  #btn-add-eq:hover { background: #d97706; }
+  #eq-list { flex: 1; overflow-y: auto; padding: 8px; }
+  .eq-group-title {
+    font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.8px; padding: 10px 8px 4px;
+  }
+  .eq-item {
+    padding: 9px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
+    display: flex; align-items: center; gap: 8px; transition: background 0.15s;
+    position: relative;
+  }
+  .eq-item:hover  { background: var(--card); }
+  .eq-item.active { background: var(--border); }
+  .eq-icon { font-size: 18px; }
+  .eq-info { flex: 1; min-width: 0; }
+  .eq-model { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eq-name  { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .eq-del   { opacity: 0; color: var(--red); background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; }
+  .eq-item:hover .eq-del { opacity: 1; }
+
+  /* ── Main ── */
+  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+  #topbar {
+    padding: 14px 24px; border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px; background: var(--surface);
+  }
+  #eq-title { font-size: 18px; font-weight: 700; flex: 1; }
+  #eq-meta  { font-size: 12px; color: var(--muted); }
+  #date-filter { display: flex; gap: 8px; align-items: center; }
+  #date-filter label { font-size: 12px; color: var(--muted); }
+  #date-filter input {
+    background: var(--card); border: 1px solid var(--border); color: var(--text);
+    padding: 5px 9px; border-radius: 6px; font-size: 12px;
+  }
+  #date-filter button {
+    padding: 5px 12px; background: var(--accent2); color: #fff; border: none;
+    border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
+  }
+
+  /* ── Tabs ── */
+  #tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
+  .tab-btn {
+    padding: 12px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
+    border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent;
+    transition: all 0.15s;
+  }
+  .tab-btn:hover  { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Content ── */
+  #content { flex: 1; overflow-y: auto; padding: 24px; }
+  .tab-pane { display: none; }
+  .tab-pane.active { display: block; }
+
+  /* ── Cards ── */
+  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
+  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
+  .stat-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+  .stat-value { font-size: 26px; font-weight: 800; margin-top: 4px; color: var(--accent); }
+  .stat-unit  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* ── Form ── */
+  .section-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
+  .section-box h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: var(--accent); }
+  .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .form-group { display: flex; flex-direction: column; gap: 5px; }
+  .form-group label { font-size: 11px; color: var(--muted); font-weight: 600; }
+  .form-group input, .form-group textarea, .form-group select {
+    background: var(--bg); border: 1px solid var(--border); color: var(--text);
+    padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
+    transition: border-color 0.15s;
+  }
+  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent2); }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .form-actions { margin-top: 12px; display: flex; gap: 8px; }
+  .btn-primary {
+    padding: 8px 20px; background: var(--accent); color: #000; border: none;
+    border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 13px;
+  }
+  .btn-primary:hover { background: #d97706; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  th { font-size: 11px; font-weight: 700; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .btn-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; opacity: 0.6; }
+  .btn-del:hover { opacity: 1; background: rgba(239,68,68,0.1); }
+  .empty-msg { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+
+  /* ── Modal ── */
+  .modal-backdrop {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
+    align-items: center; justify-content: center; z-index: 100;
+  }
+  .modal-backdrop.hidden { display: none; }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+    padding: 28px; width: 420px; max-width: 95vw;
+  }
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
+  .modal-actions { margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end; }
+  .btn-cancel { padding: 8px 18px; background: var(--border); color: var(--text); border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
+  .btn-cancel:hover { background: var(--muted); }
+
+  /* ── Empty state ── */
+  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); }
+  #empty-state .icon { font-size: 48px; margin-bottom: 12px; }
+  #empty-state p { font-size: 14px; }
+
+  /* ── Notice ── */
+  #notice {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--green); color: #fff; padding: 10px 20px;
+    border-radius: 8px; font-size: 13px; font-weight: 600;
+    transform: translateY(60px); opacity: 0; transition: all 0.25s; z-index: 200;
+  }
+  #notice.show { transform: translateY(0); opacity: 1; }
+  #notice.error { background: var(--red); }
+
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h1>⚙ 중장비 관리</h1>
+    <p>Heavy Equipment Management</p>
+  </div>
+  <button id="btn-add-eq">+ 장비 등록</button>
+  <div id="eq-list"></div>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <!-- Empty state -->
+  <div id="empty-state">
+    <div class="icon">🏗</div>
+    <p>좌측에서 장비를 선택하거나 새 장비를 등록하세요.</p>
+  </div>
+
+  <!-- Equipment view (hidden until selected) -->
+  <div id="eq-view" style="display:none; flex-direction:column; height:100%;">
+    <div id="topbar">
+      <div>
+        <div id="eq-title">장비명</div>
+        <div id="eq-meta"></div>
+      </div>
+      <div id="date-filter">
+        <label>기간</label>
+        <input type="date" id="filter-start">
+        <span style="color:var(--muted)">~</span>
+        <input type="date" id="filter-end">
+        <button onclick="applyFilter()">조회</button>
+      </div>
+    </div>
+
+    <div id="tabs">
+      <button class="tab-btn active" onclick="switchTab('operations')">가동 현황</button>
+      <button class="tab-btn" onclick="switchTab('maintenance')">정비 내역</button>
+      <button class="tab-btn" onclick="switchTab('fuel')">주유</button>
+    </div>
+
+    <div id="content">
+      <!-- Operations -->
+      <div id="tab-operations" class="tab-pane active">
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">누계 가동시간</div>
+            <div class="stat-value" id="cum-hours">0</div>
+            <div class="stat-unit">시간 (h)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">누계 가동거리</div>
+            <div class="stat-value" id="cum-dist">0</div>
+            <div class="stat-unit">km</div>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>가동 현황 입력</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>일자 *</label>
+              <input type="date" id="op-date">
+            </div>
+            <div class="form-group">
+              <label>가동시간 (h)</label>
+              <input type="number" id="op-hours" min="0" step="0.1" placeholder="0.0">
+            </div>
+            <div class="form-group">
+              <label>가동거리 (km)</label>
+              <input type="number" id="op-dist" min="0" step="0.1" placeholder="0.0">
+            </div>
+            <div class="form-group">
+              <label>비고</label>
+              <input type="text" id="op-notes" placeholder="메모">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" onclick="saveOperation()">저장</button>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>일별 가동 현황</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>일자</th>
+                  <th>가동시간 (h)</th>
+                  <th>가동거리 (km)</th>
+                  <th>비고</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="op-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Maintenance -->
+      <div id="tab-maintenance" class="tab-pane">
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">총 정비 비용</div>
+            <div class="stat-value" id="maint-total">0</div>
+            <div class="stat-unit">원</div>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>정비 내역 입력</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>일자 *</label>
+              <input type="date" id="maint-date">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label>정비 내역 *</label>
+              <input type="text" id="maint-desc" placeholder="엔진오일 교체, 타이어 교체 등">
+            </div>
+            <div class="form-group">
+              <label>비용 (원)</label>
+              <input type="number" id="maint-cost" min="0" placeholder="0">
+            </div>
+            <div class="form-group">
+              <label>정비업체 / 담당자</label>
+              <input type="text" id="maint-mechanic" placeholder="홍길동 / OO정비">
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+              <label>비고</label>
+              <input type="text" id="maint-notes" placeholder="메모">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" onclick="saveMaintenance()">저장</button>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>정비 이력</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>일자</th>
+                  <th>정비 내역</th>
+                  <th>비용</th>
+                  <th>정비업체/담당</th>
+                  <th>비고</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="maint-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fuel -->
+      <div id="tab-fuel" class="tab-pane">
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">총 주유량</div>
+            <div class="stat-value" id="fuel-total-amt">0</div>
+            <div class="stat-unit">리터 (L)</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">총 주유 비용</div>
+            <div class="stat-value" id="fuel-total-cost">0</div>
+            <div class="stat-unit">원</div>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>주유 입력</h3>
+          <div class="form-row">
+            <div class="form-group">
+              <label>일자 *</label>
+              <input type="date" id="fuel-date">
+            </div>
+            <div class="form-group">
+              <label>주유량 (L) *</label>
+              <input type="number" id="fuel-amount" min="0" step="0.1" placeholder="0.0" oninput="calcFuelTotal()">
+            </div>
+            <div class="form-group">
+              <label>단가 (원/L)</label>
+              <input type="number" id="fuel-unit-price" min="0" placeholder="0" oninput="calcFuelTotal()">
+            </div>
+            <div class="form-group">
+              <label>총 금액 (원)</label>
+              <input type="number" id="fuel-total" min="0" placeholder="자동 계산">
+            </div>
+            <div class="form-group">
+              <label>주유소</label>
+              <input type="text" id="fuel-station" placeholder="OO주유소">
+            </div>
+            <div class="form-group">
+              <label>비고</label>
+              <input type="text" id="fuel-notes" placeholder="메모">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn-primary" onclick="saveFuel()">저장</button>
+          </div>
+        </div>
+
+        <div class="section-box">
+          <h3>주유 이력</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>일자</th>
+                  <th>주유량 (L)</th>
+                  <th>단가 (원/L)</th>
+                  <th>총 금액 (원)</th>
+                  <th>주유소</th>
+                  <th>비고</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="fuel-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Add Equipment -->
+<div id="modal-add-eq" class="modal-backdrop hidden">
+  <div class="modal">
+    <h2>장비 등록</h2>
+    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
+      <div class="form-group">
+        <label>구분 (종류) *</label>
+        <select id="eq-type">
+          <option value="">선택하세요</option>
+          <option>포크레인</option>
+          <option>지게차</option>
+          <option>크레인</option>
+          <option>불도저</option>
+          <option>로더</option>
+          <option>덤프트럭</option>
+          <option>지게차</option>
+          <option>롤러</option>
+          <option>기타</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>모델명 *</label>
+        <input type="text" id="eq-model" placeholder="예: HD1200">
+      </div>
+      <div class="form-group">
+        <label>장비 이름 / 별칭</label>
+        <input type="text" id="eq-name" placeholder="예: 1호기">
+      </div>
+      <div class="form-group">
+        <label>관리번호 / 차대번호</label>
+        <input type="text" id="eq-serial" placeholder="선택 사항">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" onclick="closeModal()">취소</button>
+      <button class="btn-primary" onclick="addEquipment()">등록</button>
+    </div>
+  </div>
+</div>
+
+<div id="notice"></div>
+
+<script>
+const EQ_ICONS = {
+  '포크레인': '🦺', '지게차': '🏗', '크레인': '🔧', '불도저': '🚜',
+  '로더': '🚛', '덤프트럭': '🚚', '롤러': '⚙', '기타': '🔩'
+};
+
+let currentEqId = null;
+let equipmentList = [];
+
+// ── Utility ──────────────────────────────────────────────────────────────────
+
+function showNotice(msg, isError = false) {
+  const el = document.getElementById('notice');
+  el.textContent = msg;
+  el.className = isError ? 'error show' : 'show';
+  setTimeout(() => el.className = '', 2500);
+}
+
+function fmt(n) { return Number(n).toLocaleString('ko-KR'); }
+function today() { return new Date().toISOString().slice(0, 10); }
+
+async function api(method, path, body) {
+  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || '오류가 발생했습니다.');
+  return data;
+}
+
+// ── Equipment ─────────────────────────────────────────────────────────────────
+
+async function loadEquipment() {
+  equipmentList = await api('GET', '/api/equipment');
+  renderEquipmentList();
+}
+
+function renderEquipmentList() {
+  const container = document.getElementById('eq-list');
+  container.innerHTML = '';
+
+  const groups = {};
+  equipmentList.forEach(eq => {
+    if (!groups[eq.type]) groups[eq.type] = [];
+    groups[eq.type].push(eq);
+  });
+
+  Object.entries(groups).forEach(([type, items]) => {
+    const title = document.createElement('div');
+    title.className = 'eq-group-title';
+    title.textContent = type;
+    container.appendChild(title);
+
+    items.forEach(eq => {
+      const div = document.createElement('div');
+      div.className = 'eq-item' + (eq.id === currentEqId ? ' active' : '');
+      div.dataset.id = eq.id;
+      div.innerHTML = `
+        <span class="eq-icon">${EQ_ICONS[eq.type] || '⚙'}</span>
+        <div class="eq-info">
+          <div class="eq-model">${eq.model}${eq.name ? ` <span style="color:var(--muted);font-weight:400">(${eq.name})</span>` : ''}</div>
+          ${eq.serial_number ? `<div class="eq-name">${eq.serial_number}</div>` : ''}
+        </div>
+        <button class="eq-del" title="삭제" onclick="deleteEquipment(event, ${eq.id})">✕</button>`;
+      div.onclick = () => selectEquipment(eq);
+      container.appendChild(div);
+    });
+  });
+}
+
+function selectEquipment(eq) {
+  currentEqId = eq.id;
+  document.getElementById('empty-state').style.display = 'none';
+  const view = document.getElementById('eq-view');
+  view.style.display = 'flex';
+  document.getElementById('eq-title').textContent =
+    `${EQ_ICONS[eq.type] || '⚙'} ${eq.type} · ${eq.model}${eq.name ? ` (${eq.name})` : ''}`;
+  document.getElementById('eq-meta').textContent =
+    eq.serial_number ? `관리번호: ${eq.serial_number}` : '';
+
+  // Set default dates
+  const end = today();
+  const start = end.slice(0, 7) + '-01';
+  document.getElementById('filter-start').value = start;
+  document.getElementById('filter-end').value   = end;
+  document.getElementById('op-date').value       = end;
+  document.getElementById('maint-date').value    = end;
+  document.getElementById('fuel-date').value     = end;
+
+  renderEquipmentList();
+  loadCurrentTab();
+}
+
+async function addEquipment() {
+  const type   = document.getElementById('eq-type').value;
+  const model  = document.getElementById('eq-model').value.trim();
+  const name   = document.getElementById('eq-name').value.trim();
+  const serial = document.getElementById('eq-serial').value.trim();
+  if (!type || !model) { showNotice('구분과 모델명을 입력해주세요.', true); return; }
+  try {
+    await api('POST', '/api/equipment', { type, model, name, serial_number: serial });
+    showNotice('장비가 등록되었습니다.');
+    closeModal();
+    await loadEquipment();
+  } catch (e) { showNotice(e.message, true); }
+}
+
+async function deleteEquipment(e, id) {
+  e.stopPropagation();
+  if (!confirm('장비를 삭제하면 모든 관련 데이터가 삭제됩니다. 삭제하시겠습니까?')) return;
+  try {
+    await api('DELETE', `/api/equipment/${id}`);
+    if (currentEqId === id) {
+      currentEqId = null;
+      document.getElementById('empty-state').style.display = 'flex';
+      document.getElementById('eq-view').style.display = 'none';
+    }
+    showNotice('삭제되었습니다.');
+    await loadEquipment();
+  } catch (e) { showNotice(e.message, true); }
+}
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+
+let activeTab = 'operations';
+
+function switchTab(tab) {
+  activeTab = tab;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const names = ['operations', 'maintenance', 'fuel'];
+    b.classList.toggle('active', names[i] === tab);
+  });
+  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+  document.getElementById(`tab-${tab}`).classList.add('active');
+  loadCurrentTab();
+}
+
+function loadCurrentTab() {
+  if (activeTab === 'operations') loadOperations();
+  else if (activeTab === 'maintenance') loadMaintenance();
+  else if (activeTab === 'fuel') loadFuel();
+}
+
+function applyFilter() { loadCurrentTab(); }
+
+function getFilter() {
+  return {
+    start: document.getElementById('filter-start').value,
+    end:   document.getElementById('filter-end').value,
+  };
+}
+
+// ── Operations ────────────────────────────────────────────────────────────────
+
+async function loadOperations() {
+  if (!currentEqId) return;
+  const { start, end } = getFilter();
+  const data = await api('GET', `/api/equipment/${currentEqId}/operations?start=${start}&end=${end}`);
+  document.getElementById('cum-hours').textContent = fmt(data.cumulative.total_hours);
+  document.getElementById('cum-dist').textContent  = fmt(data.cumulative.total_distance);
+
+  const tbody = document.getElementById('op-tbody');
+  if (!data.records.length) {
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">가동 현황 데이터가 없습니다.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.records.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${fmt(r.operating_hours)} h</td>
+      <td>${fmt(r.operating_distance)} km</td>
+      <td>${r.notes || '-'}</td>
+      <td><button class="btn-del" onclick="deleteOperation(${r.id})">🗑</button></td>
+    </tr>`).join('');
+}
+
+async function saveOperation() {
+  if (!currentEqId) return;
+  const date   = document.getElementById('op-date').value;
+  const hours  = document.getElementById('op-hours').value;
+  const dist   = document.getElementById('op-dist').value;
+  const notes  = document.getElementById('op-notes').value;
+  if (!date) { showNotice('날짜를 입력해주세요.', true); return; }
+  try {
+    await api('POST', `/api/equipment/${currentEqId}/operations`,
+      { date, operating_hours: hours || 0, operating_distance: dist || 0, notes });
+    showNotice('저장되었습니다.');
+    document.getElementById('op-hours').value = '';
+    document.getElementById('op-dist').value  = '';
+    document.getElementById('op-notes').value = '';
+    loadOperations();
+  } catch (e) { showNotice(e.message, true); }
+}
+
+async function deleteOperation(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await api('DELETE', `/api/equipment/${currentEqId}/operations/${id}`);
+  showNotice('삭제되었습니다.');
+  loadOperations();
+}
+
+// ── Maintenance ───────────────────────────────────────────────────────────────
+
+async function loadMaintenance() {
+  if (!currentEqId) return;
+  const data = await api('GET', `/api/equipment/${currentEqId}/maintenance`);
+  document.getElementById('maint-total').textContent = fmt(data.total_cost);
+
+  const tbody = document.getElementById('maint-tbody');
+  if (!data.records.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">정비 내역이 없습니다.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.records.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${r.description}</td>
+      <td>${r.cost ? fmt(r.cost) + ' 원' : '-'}</td>
+      <td>${r.mechanic || '-'}</td>
+      <td>${r.notes || '-'}</td>
+      <td><button class="btn-del" onclick="deleteMaintenance(${r.id})">🗑</button></td>
+    </tr>`).join('');
+}
+
+async function saveMaintenance() {
+  if (!currentEqId) return;
+  const date     = document.getElementById('maint-date').value;
+  const desc     = document.getElementById('maint-desc').value.trim();
+  const cost     = document.getElementById('maint-cost').value;
+  const mechanic = document.getElementById('maint-mechanic').value.trim();
+  const notes    = document.getElementById('maint-notes').value.trim();
+  if (!date || !desc) { showNotice('날짜와 정비 내역을 입력해주세요.', true); return; }
+  try {
+    await api('POST', `/api/equipment/${currentEqId}/maintenance`,
+      { date, description: desc, cost: cost || 0, mechanic, notes });
+    showNotice('저장되었습니다.');
+    ['maint-desc','maint-cost','maint-mechanic','maint-notes'].forEach(id => document.getElementById(id).value = '');
+    loadMaintenance();
+  } catch (e) { showNotice(e.message, true); }
+}
+
+async function deleteMaintenance(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await api('DELETE', `/api/equipment/${currentEqId}/maintenance/${id}`);
+  showNotice('삭제되었습니다.');
+  loadMaintenance();
+}
+
+// ── Fuel ──────────────────────────────────────────────────────────────────────
+
+function calcFuelTotal() {
+  const amt   = parseFloat(document.getElementById('fuel-amount').value) || 0;
+  const price = parseInt(document.getElementById('fuel-unit-price').value) || 0;
+  if (amt && price) document.getElementById('fuel-total').value = Math.round(amt * price);
+}
+
+async function loadFuel() {
+  if (!currentEqId) return;
+  const data = await api('GET', `/api/equipment/${currentEqId}/fuel`);
+  document.getElementById('fuel-total-amt').textContent  = fmt(data.total_amount);
+  document.getElementById('fuel-total-cost').textContent = fmt(data.total_cost);
+
+  const tbody = document.getElementById('fuel-tbody');
+  if (!data.records.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">주유 내역이 없습니다.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.records.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${fmt(r.amount)} L</td>
+      <td>${r.unit_price ? fmt(r.unit_price) : '-'}</td>
+      <td>${r.total_cost ? fmt(r.total_cost) + ' 원' : '-'}</td>
+      <td>${r.station || '-'}</td>
+      <td>${r.notes || '-'}</td>
+      <td><button class="btn-del" onclick="deleteFuel(${r.id})">🗑</button></td>
+    </tr>`).join('');
+}
+
+async function saveFuel() {
+  if (!currentEqId) return;
+  const date       = document.getElementById('fuel-date').value;
+  const amount     = document.getElementById('fuel-amount').value;
+  const unit_price = document.getElementById('fuel-unit-price').value;
+  const total_cost = document.getElementById('fuel-total').value;
+  const station    = document.getElementById('fuel-station').value.trim();
+  const notes      = document.getElementById('fuel-notes').value.trim();
+  if (!date || !amount) { showNotice('날짜와 주유량을 입력해주세요.', true); return; }
+  try {
+    await api('POST', `/api/equipment/${currentEqId}/fuel`,
+      { date, amount, unit_price: unit_price || 0, total_cost: total_cost || 0, station, notes });
+    showNotice('저장되었습니다.');
+    ['fuel-amount','fuel-unit-price','fuel-total','fuel-station','fuel-notes'].forEach(id => document.getElementById(id).value = '');
+    loadFuel();
+  } catch (e) { showNotice(e.message, true); }
+}
+
+async function deleteFuel(id) {
+  if (!confirm('삭제하시겠습니까?')) return;
+  await api('DELETE', `/api/equipment/${currentEqId}/fuel/${id}`);
+  showNotice('삭제되었습니다.');
+  loadFuel();
+}
+
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
+document.getElementById('btn-add-eq').onclick = () => {
+  document.getElementById('eq-type').value   = '';
+  document.getElementById('eq-model').value  = '';
+  document.getElementById('eq-name').value   = '';
+  document.getElementById('eq-serial').value = '';
+  document.getElementById('modal-add-eq').classList.remove('hidden');
+};
+
+function closeModal() {
+  document.getElementById('modal-add-eq').classList.add('hidden');
+}
+
+document.getElementById('modal-add-eq').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeModal();
+});
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadEquipment();
+</script>
+</body>
+</html>
