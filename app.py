@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from flask import Flask, request, jsonify, render_template, g
+from flask import Flask, request, jsonify, render_template, g, send_from_directory
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -78,6 +78,18 @@ def init_db():
 
 
 # ── Equipment ────────────────────────────────────────────────────────────────
+
+@app.route('/manifest.json')
+def serve_manifest():
+    return send_from_directory('static', 'manifest.json')
+
+
+@app.route('/sw.js')
+def serve_sw():
+    resp = send_from_directory('static', 'sw.js', mimetype='application/javascript')
+    resp.headers['Service-Worker-Allowed'] = '/'
+    return resp
+
 
 @app.route('/')
 def index():

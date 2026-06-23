@@ -2,462 +2,456 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>중장비 관리 시스템</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="중장비">
+<meta name="theme-color" content="#f59e0b">
+<title>중장비 관리</title>
+<link rel="manifest" href="/manifest.json">
 <style>
-  :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --card: #22263a;
-    --border: #2e3350;
-    --accent: #f59e0b;
-    --accent2: #3b82f6;
-    --green: #10b981;
-    --red: #ef4444;
-    --text: #e2e8f0;
-    --muted: #64748b;
-    --radius: 10px;
-  }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: var(--bg); color: var(--text); font-family: 'Pretendard', 'Segoe UI', sans-serif; display: flex; height: 100vh; overflow: hidden; font-size: 14px; }
+:root {
+  --bg: #0f1117;
+  --surface: #1a1d27;
+  --card: #22263a;
+  --border: #2e3350;
+  --accent: #f59e0b;
+  --accent2: #3b82f6;
+  --green: #10b981;
+  --red: #ef4444;
+  --text: #e2e8f0;
+  --muted: #64748b;
+  --radius: 12px;
+  --nav-h: 60px;
+  --hdr-h: 56px;
+  --sbot: env(safe-area-inset-bottom, 0px);
+  --stop: env(safe-area-inset-top, 0px);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: -apple-system, 'Pretendard', 'Segoe UI', sans-serif;
+  height: 100dvh; overflow: hidden; font-size: 15px;
+}
 
-  /* ── Sidebar ── */
-  #sidebar {
-    width: 260px; min-width: 260px; background: var(--surface);
-    border-right: 1px solid var(--border); display: flex; flex-direction: column; overflow: hidden;
-  }
-  #sidebar-header { padding: 18px 16px 12px; border-bottom: 1px solid var(--border); }
-  #sidebar-header h1 { font-size: 15px; font-weight: 700; color: var(--accent); letter-spacing: -0.3px; }
-  #sidebar-header p  { font-size: 11px; color: var(--muted); margin-top: 2px; }
-  #btn-add-eq {
-    margin: 12px 16px; padding: 8px; background: var(--accent); color: #000;
-    border: none; border-radius: var(--radius); cursor: pointer; font-weight: 700; font-size: 13px; width: calc(100% - 32px);
-  }
-  #btn-add-eq:hover { background: #d97706; }
-  #eq-list { flex: 1; overflow-y: auto; padding: 8px; }
-  .eq-group-title {
-    font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase;
-    letter-spacing: 0.8px; padding: 10px 8px 4px;
-  }
-  .eq-item {
-    padding: 9px 12px; border-radius: 8px; cursor: pointer; margin-bottom: 2px;
-    display: flex; align-items: center; gap: 8px; transition: background 0.15s;
-    position: relative;
-  }
-  .eq-item:hover  { background: var(--card); }
-  .eq-item.active { background: var(--border); }
-  .eq-icon { font-size: 18px; }
-  .eq-info { flex: 1; min-width: 0; }
-  .eq-model { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .eq-name  { font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .eq-del   { opacity: 0; color: var(--red); background: none; border: none; cursor: pointer; font-size: 14px; padding: 2px 4px; border-radius: 4px; }
-  .eq-item:hover .eq-del { opacity: 1; }
+/* ── Shell ── */
+#app { display: flex; flex-direction: column; height: 100dvh; padding-top: var(--stop); }
 
-  /* ── Main ── */
-  #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-  #topbar {
-    padding: 14px 24px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 16px; background: var(--surface);
-  }
-  #eq-title { font-size: 18px; font-weight: 700; flex: 1; }
-  #eq-meta  { font-size: 12px; color: var(--muted); }
-  #date-filter { display: flex; gap: 8px; align-items: center; }
-  #date-filter label { font-size: 12px; color: var(--muted); }
-  #date-filter input {
-    background: var(--card); border: 1px solid var(--border); color: var(--text);
-    padding: 5px 9px; border-radius: 6px; font-size: 12px;
-  }
-  #date-filter button {
-    padding: 5px 12px; background: var(--accent2); color: #fff; border: none;
-    border-radius: 6px; cursor: pointer; font-size: 12px; font-weight: 600;
-  }
+/* ── Header ── */
+#header {
+  height: var(--hdr-h); background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; padding: 0 16px; gap: 10px; flex-shrink: 0;
+}
+#hdr-icon { font-size: 22px; }
+#hdr-info { flex: 1; min-width: 0; }
+#hdr-name {
+  font-size: 15px; font-weight: 700; color: var(--accent);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#hdr-meta { font-size: 11px; color: var(--muted); margin-top: 1px; }
 
-  /* ── Tabs ── */
-  #tabs { display: flex; gap: 2px; padding: 0 24px; background: var(--surface); border-bottom: 1px solid var(--border); }
-  .tab-btn {
-    padding: 12px 20px; font-size: 13px; font-weight: 600; cursor: pointer;
-    border: none; background: none; color: var(--muted); border-bottom: 2px solid transparent;
-    transition: all 0.15s;
-  }
-  .tab-btn:hover  { color: var(--text); }
-  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+/* ── Scroll area ── */
+#content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
 
-  /* ── Content ── */
-  #content { flex: 1; overflow-y: auto; padding: 24px; }
-  .tab-pane { display: none; }
-  .tab-pane.active { display: block; }
+/* ── Views ── */
+.view { display: none; padding: 16px 16px 8px; }
+.view.active { display: block; }
 
-  /* ── Cards ── */
-  .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 20px; }
-  .stat-card { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; }
-  .stat-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
-  .stat-value { font-size: 26px; font-weight: 800; margin-top: 4px; color: var(--accent); }
-  .stat-unit  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+/* ── Bottom Nav ── */
+#bottom-nav {
+  height: calc(var(--nav-h) + var(--sbot));
+  background: var(--surface); border-top: 1px solid var(--border);
+  display: flex; flex-shrink: 0; padding-bottom: var(--sbot);
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 3px; background: none; border: none;
+  color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 600;
+  padding: 8px 4px; transition: color 0.15s;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-btn svg { width: 22px; height: 22px; }
 
-  /* ── Form ── */
-  .section-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 20px; }
-  .section-box h3 { font-size: 13px; font-weight: 700; margin-bottom: 14px; color: var(--accent); }
-  .form-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
-  .form-group { display: flex; flex-direction: column; gap: 5px; }
-  .form-group label { font-size: 11px; color: var(--muted); font-weight: 600; }
-  .form-group input, .form-group textarea, .form-group select {
-    background: var(--bg); border: 1px solid var(--border); color: var(--text);
-    padding: 7px 10px; border-radius: 6px; font-size: 13px; outline: none;
-    transition: border-color 0.15s;
-  }
-  .form-group input:focus, .form-group textarea:focus, .form-group select:focus { border-color: var(--accent2); }
-  .form-group textarea { resize: vertical; min-height: 60px; }
-  .form-actions { margin-top: 12px; display: flex; gap: 8px; }
-  .btn-primary {
-    padding: 8px 20px; background: var(--accent); color: #000; border: none;
-    border-radius: 6px; cursor: pointer; font-weight: 700; font-size: 13px;
-  }
-  .btn-primary:hover { background: #d97706; }
+/* ── FAB ── */
+#fab {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--sbot) + 16px);
+  right: 16px; width: 52px; height: 52px;
+  background: var(--accent); border-radius: 50%; border: none;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  font-size: 26px; font-weight: 300; color: #000;
+  box-shadow: 0 4px 16px rgba(245,158,11,0.4); z-index: 50; transition: transform 0.15s;
+}
+#fab:active { transform: scale(0.9); }
+#fab.hidden { display: none; }
 
-  /* ── Table ── */
-  .table-wrap { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; }
-  th { font-size: 11px; font-weight: 700; color: var(--muted); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--border); text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 10px 12px; border-bottom: 1px solid var(--border); font-size: 13px; vertical-align: middle; }
-  tr:last-child td { border-bottom: none; }
-  tr:hover td { background: rgba(255,255,255,0.02); }
-  .btn-del { background: none; border: none; color: var(--red); cursor: pointer; font-size: 14px; padding: 2px 6px; border-radius: 4px; opacity: 0.6; }
-  .btn-del:hover { opacity: 1; background: rgba(239,68,68,0.1); }
-  .empty-msg { text-align: center; color: var(--muted); padding: 32px; font-size: 13px; }
+/* ── Equipment cards ── */
+.eq-group-label {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 0.8px; padding: 14px 0 6px;
+}
+.eq-group-label:first-child { padding-top: 0; }
+.eq-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 8px; cursor: pointer; transition: border-color 0.15s;
+}
+.eq-card:active, .eq-card.active { border-color: var(--accent); background: rgba(245,158,11,0.07); }
+.eq-card-icon { font-size: 28px; }
+.eq-card-info { flex: 1; min-width: 0; }
+.eq-card-model { font-size: 15px; font-weight: 700; }
+.eq-card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.eq-del-btn {
+  width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  background: rgba(239,68,68,0.1); border: none; border-radius: 8px;
+  cursor: pointer; color: var(--red); font-size: 15px; flex-shrink: 0;
+}
 
-  /* ── Modal ── */
-  .modal-backdrop {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: flex;
-    align-items: center; justify-content: center; z-index: 100;
-  }
-  .modal-backdrop.hidden { display: none; }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
-    padding: 28px; width: 420px; max-width: 95vw;
-  }
-  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 20px; }
-  .modal-actions { margin-top: 20px; display: flex; gap: 8px; justify-content: flex-end; }
-  .btn-cancel { padding: 8px 18px; background: var(--border); color: var(--text); border: none; border-radius: 6px; cursor: pointer; font-size: 13px; }
-  .btn-cancel:hover { background: var(--muted); }
+/* ── Empty states ── */
+.empty-hero { text-align: center; padding: 60px 24px; color: var(--muted); }
+.empty-hero .icon { font-size: 52px; margin-bottom: 14px; }
+.empty-hero p { font-size: 14px; line-height: 1.7; }
+.empty-msg { text-align: center; color: var(--muted); padding: 28px 16px; font-size: 14px; }
 
-  /* ── Empty state ── */
-  #empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--muted); }
-  #empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-  #empty-state p { font-size: 14px; }
+/* ── Stats ── */
+.stat-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.stat-card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+}
+.stat-card.wide { grid-column: span 2; }
+.stat-label { font-size: 10px; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+.stat-value { font-size: 26px; font-weight: 800; margin-top: 4px; color: var(--accent); }
+.stat-unit  { font-size: 11px; color: var(--muted); margin-top: 2px; }
 
-  /* ── Notice ── */
-  #notice {
-    position: fixed; bottom: 24px; right: 24px;
-    background: var(--green); color: #fff; padding: 10px 20px;
-    border-radius: 8px; font-size: 13px; font-weight: 600;
-    transform: translateY(60px); opacity: 0; transition: all 0.25s; z-index: 200;
-  }
-  #notice.show { transform: translateY(0); opacity: 1; }
-  #notice.error { background: var(--red); }
+/* ── Date filter ── */
+.date-filter {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px 14px;
+  margin-bottom: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+}
+.date-filter label { font-size: 12px; color: var(--muted); }
+.date-filter input {
+  flex: 1; min-width: 110px; background: var(--bg);
+  border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; border-radius: 8px; font-size: 13px; outline: none;
+}
+.date-filter button {
+  padding: 8px 14px; background: var(--accent2); color: #fff;
+  border: none; border-radius: 8px; font-size: 13px; font-weight: 600;
+  cursor: pointer; white-space: nowrap;
+}
 
-  ::-webkit-scrollbar { width: 5px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* ── Section box ── */
+.section {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; margin-bottom: 14px;
+}
+.section-title { font-size: 13px; font-weight: 700; color: var(--accent); margin-bottom: 14px; }
+
+/* ── Forms ── */
+.fg { margin-bottom: 12px; }
+.fg label { display: block; font-size: 12px; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+.fg input, .fg select, .fg textarea {
+  width: 100%; background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); padding: 12px 14px; border-radius: 10px;
+  font-size: 15px; outline: none; transition: border-color 0.15s;
+  -webkit-appearance: none; appearance: none;
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--accent2); }
+.fg textarea { min-height: 72px; resize: vertical; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.btn-save {
+  width: 100%; padding: 14px; background: var(--accent); color: #000;
+  border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+  cursor: pointer; margin-top: 2px;
+}
+.btn-save:active { background: #d97706; }
+
+/* ── Records ── */
+.rec-list { display: flex; flex-direction: column; gap: 8px; }
+.rec-item {
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; padding: 12px 14px;
+  display: flex; align-items: flex-start; gap: 10px;
+}
+.rec-info { flex: 1; min-width: 0; }
+.rec-date { font-size: 12px; color: var(--muted); }
+.rec-main { font-size: 14px; font-weight: 600; margin-top: 3px; }
+.rec-sub  { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.rec-del {
+  width: 32px; height: 32px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(239,68,68,0.1); border: none; border-radius: 8px;
+  cursor: pointer; color: var(--red); font-size: 14px;
+}
+
+/* ── Bottom sheet ── */
+.sheet-bg {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.65);
+  z-index: 100; display: flex; align-items: flex-end;
+}
+.sheet-bg.hidden { display: none; }
+.sheet {
+  background: var(--surface); border-top: 1px solid var(--border);
+  border-radius: 20px 20px 0 0;
+  padding: 0 20px calc(20px + var(--sbot));
+  width: 100%; max-height: 88dvh; overflow-y: auto;
+}
+.sheet-drag { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 14px auto 20px; }
+.sheet-title { font-size: 17px; font-weight: 700; margin-bottom: 20px; }
+.btn-cancel {
+  width: 100%; padding: 13px; background: none; border: none;
+  color: var(--muted); font-size: 15px; margin-top: 6px; cursor: pointer;
+}
+
+/* ── Toast ── */
+#toast {
+  position: fixed;
+  top: calc(var(--stop) + var(--hdr-h) + 12px);
+  left: 16px; right: 16px;
+  background: var(--green); color: #fff;
+  padding: 12px 16px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; text-align: center;
+  transform: translateY(-80px); opacity: 0;
+  transition: all 0.25s; z-index: 200;
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.err  { background: var(--red); }
+
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 </style>
 </head>
 <body>
+<div id="app">
 
-<!-- Sidebar -->
-<div id="sidebar">
-  <div id="sidebar-header">
-    <h1>⚙ 중장비 관리</h1>
-    <p>Heavy Equipment Management</p>
-  </div>
-  <button id="btn-add-eq">+ 장비 등록</button>
-  <div id="eq-list"></div>
-</div>
-
-<!-- Main -->
-<div id="main">
-  <!-- Empty state -->
-  <div id="empty-state">
-    <div class="icon">🏗</div>
-    <p>좌측에서 장비를 선택하거나 새 장비를 등록하세요.</p>
+  <!-- Header -->
+  <div id="header">
+    <div id="hdr-icon">⚙</div>
+    <div id="hdr-info">
+      <div id="hdr-name">중장비 관리</div>
+      <div id="hdr-meta">장비를 선택하세요</div>
+    </div>
   </div>
 
-  <!-- Equipment view (hidden until selected) -->
-  <div id="eq-view" style="display:none; flex-direction:column; height:100%;">
-    <div id="topbar">
-      <div>
-        <div id="eq-title">장비명</div>
-        <div id="eq-meta"></div>
-      </div>
-      <div id="date-filter">
-        <label>기간</label>
-        <input type="date" id="filter-start">
-        <span style="color:var(--muted)">~</span>
-        <input type="date" id="filter-end">
-        <button onclick="applyFilter()">조회</button>
+  <!-- Content -->
+  <div id="content">
+
+    <!-- View: Equipment -->
+    <div id="view-eq" class="view active">
+      <div id="eq-container">
+        <div class="empty-hero">
+          <div class="icon">🏗</div>
+          <p>등록된 장비가 없습니다.<br>오른쪽 하단 <b>+</b> 버튼으로 추가하세요.</p>
+        </div>
       </div>
     </div>
 
-    <div id="tabs">
-      <button class="tab-btn active" onclick="switchTab('operations')">가동 현황</button>
-      <button class="tab-btn" onclick="switchTab('maintenance')">정비 내역</button>
-      <button class="tab-btn" onclick="switchTab('fuel')">주유</button>
-    </div>
-
-    <div id="content">
-      <!-- Operations -->
-      <div id="tab-operations" class="tab-pane active">
+    <!-- View: Operations -->
+    <div id="view-ops" class="view">
+      <div id="no-eq-ops" class="empty-hero">
+        <div class="icon">⏱</div>
+        <p>장비 탭에서 장비를 선택하세요.</p>
+      </div>
+      <div id="ops-body" style="display:none">
+        <div class="date-filter">
+          <label>기간</label>
+          <input type="date" id="f-start">
+          <span style="color:var(--muted);font-size:12px">~</span>
+          <input type="date" id="f-end">
+          <button onclick="applyFilter()">조회</button>
+        </div>
         <div class="stat-row">
           <div class="stat-card">
             <div class="stat-label">누계 가동시간</div>
-            <div class="stat-value" id="cum-hours">0</div>
+            <div class="stat-value" id="cum-h">0</div>
             <div class="stat-unit">시간 (h)</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">누계 가동거리</div>
-            <div class="stat-value" id="cum-dist">0</div>
+            <div class="stat-value" id="cum-d">0</div>
             <div class="stat-unit">km</div>
           </div>
         </div>
-
-        <div class="section-box">
-          <h3>가동 현황 입력</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label>일자 *</label>
-              <input type="date" id="op-date">
-            </div>
-            <div class="form-group">
-              <label>가동시간 (h)</label>
-              <input type="number" id="op-hours" min="0" step="0.1" placeholder="0.0">
-            </div>
-            <div class="form-group">
-              <label>가동거리 (km)</label>
-              <input type="number" id="op-dist" min="0" step="0.1" placeholder="0.0">
-            </div>
-            <div class="form-group">
-              <label>비고</label>
-              <input type="text" id="op-notes" placeholder="메모">
-            </div>
+        <div class="section">
+          <div class="section-title">가동 현황 입력</div>
+          <div class="row2">
+            <div class="fg"><label>일자 *</label><input type="date" id="op-date"></div>
+            <div class="fg"><label>가동시간 (h)</label><input type="number" id="op-h" min="0" step="0.1" placeholder="0.0"></div>
           </div>
-          <div class="form-actions">
-            <button class="btn-primary" onclick="saveOperation()">저장</button>
+          <div class="row2">
+            <div class="fg"><label>가동거리 (km)</label><input type="number" id="op-d" min="0" step="0.1" placeholder="0.0"></div>
+            <div class="fg"><label>비고</label><input type="text" id="op-note" placeholder="메모"></div>
           </div>
+          <button class="btn-save" onclick="saveOp()">저장</button>
         </div>
-
-        <div class="section-box">
-          <h3>일별 가동 현황</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>일자</th>
-                  <th>가동시간 (h)</th>
-                  <th>가동거리 (km)</th>
-                  <th>비고</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="op-tbody"></tbody>
-            </table>
-          </div>
+        <div class="section">
+          <div class="section-title">일별 가동 현황</div>
+          <div class="rec-list" id="op-list"></div>
         </div>
       </div>
+    </div>
 
-      <!-- Maintenance -->
-      <div id="tab-maintenance" class="tab-pane">
+    <!-- View: Maintenance -->
+    <div id="view-maint" class="view">
+      <div id="no-eq-maint" class="empty-hero">
+        <div class="icon">🔧</div>
+        <p>장비 탭에서 장비를 선택하세요.</p>
+      </div>
+      <div id="maint-body" style="display:none">
         <div class="stat-row">
-          <div class="stat-card">
+          <div class="stat-card wide">
             <div class="stat-label">총 정비 비용</div>
             <div class="stat-value" id="maint-total">0</div>
             <div class="stat-unit">원</div>
           </div>
         </div>
-
-        <div class="section-box">
-          <h3>정비 내역 입력</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label>일자 *</label>
-              <input type="date" id="maint-date">
-            </div>
-            <div class="form-group" style="grid-column: span 2;">
-              <label>정비 내역 *</label>
-              <input type="text" id="maint-desc" placeholder="엔진오일 교체, 타이어 교체 등">
-            </div>
-            <div class="form-group">
-              <label>비용 (원)</label>
-              <input type="number" id="maint-cost" min="0" placeholder="0">
-            </div>
-            <div class="form-group">
-              <label>정비업체 / 담당자</label>
-              <input type="text" id="maint-mechanic" placeholder="홍길동 / OO정비">
-            </div>
-            <div class="form-group" style="grid-column: span 2;">
-              <label>비고</label>
-              <input type="text" id="maint-notes" placeholder="메모">
-            </div>
+        <div class="section">
+          <div class="section-title">정비 내역 입력</div>
+          <div class="row2">
+            <div class="fg"><label>일자 *</label><input type="date" id="m-date"></div>
+            <div class="fg"><label>비용 (원)</label><input type="number" id="m-cost" min="0" placeholder="0"></div>
           </div>
-          <div class="form-actions">
-            <button class="btn-primary" onclick="saveMaintenance()">저장</button>
+          <div class="fg"><label>정비 내역 *</label><input type="text" id="m-desc" placeholder="엔진오일 교체 등"></div>
+          <div class="row2">
+            <div class="fg"><label>정비업체/담당</label><input type="text" id="m-mech" placeholder="홍길동/OO정비"></div>
+            <div class="fg"><label>비고</label><input type="text" id="m-note" placeholder="메모"></div>
           </div>
+          <button class="btn-save" onclick="saveMaint()">저장</button>
         </div>
-
-        <div class="section-box">
-          <h3>정비 이력</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>일자</th>
-                  <th>정비 내역</th>
-                  <th>비용</th>
-                  <th>정비업체/담당</th>
-                  <th>비고</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="maint-tbody"></tbody>
-            </table>
-          </div>
+        <div class="section">
+          <div class="section-title">정비 이력</div>
+          <div class="rec-list" id="maint-list"></div>
         </div>
       </div>
+    </div>
 
-      <!-- Fuel -->
-      <div id="tab-fuel" class="tab-pane">
+    <!-- View: Fuel -->
+    <div id="view-fuel" class="view">
+      <div id="no-eq-fuel" class="empty-hero">
+        <div class="icon">⛽</div>
+        <p>장비 탭에서 장비를 선택하세요.</p>
+      </div>
+      <div id="fuel-body" style="display:none">
         <div class="stat-row">
           <div class="stat-card">
             <div class="stat-label">총 주유량</div>
-            <div class="stat-value" id="fuel-total-amt">0</div>
+            <div class="stat-value" id="fuel-amt">0</div>
             <div class="stat-unit">리터 (L)</div>
           </div>
           <div class="stat-card">
             <div class="stat-label">총 주유 비용</div>
-            <div class="stat-value" id="fuel-total-cost">0</div>
+            <div class="stat-value" id="fuel-cost">0</div>
             <div class="stat-unit">원</div>
           </div>
         </div>
-
-        <div class="section-box">
-          <h3>주유 입력</h3>
-          <div class="form-row">
-            <div class="form-group">
-              <label>일자 *</label>
-              <input type="date" id="fuel-date">
-            </div>
-            <div class="form-group">
-              <label>주유량 (L) *</label>
-              <input type="number" id="fuel-amount" min="0" step="0.1" placeholder="0.0" oninput="calcFuelTotal()">
-            </div>
-            <div class="form-group">
-              <label>단가 (원/L)</label>
-              <input type="number" id="fuel-unit-price" min="0" placeholder="0" oninput="calcFuelTotal()">
-            </div>
-            <div class="form-group">
-              <label>총 금액 (원)</label>
-              <input type="number" id="fuel-total" min="0" placeholder="자동 계산">
-            </div>
-            <div class="form-group">
-              <label>주유소</label>
-              <input type="text" id="fuel-station" placeholder="OO주유소">
-            </div>
-            <div class="form-group">
-              <label>비고</label>
-              <input type="text" id="fuel-notes" placeholder="메모">
-            </div>
+        <div class="section">
+          <div class="section-title">주유 입력</div>
+          <div class="row2">
+            <div class="fg"><label>일자 *</label><input type="date" id="fu-date"></div>
+            <div class="fg"><label>주유량 (L) *</label><input type="number" id="fu-amt" min="0" step="0.1" placeholder="0.0" oninput="calcFuel()"></div>
           </div>
-          <div class="form-actions">
-            <button class="btn-primary" onclick="saveFuel()">저장</button>
+          <div class="row2">
+            <div class="fg"><label>단가 (원/L)</label><input type="number" id="fu-price" min="0" placeholder="0" oninput="calcFuel()"></div>
+            <div class="fg"><label>총 금액 (원)</label><input type="number" id="fu-total" min="0" placeholder="자동 계산"></div>
           </div>
+          <div class="row2">
+            <div class="fg"><label>주유소</label><input type="text" id="fu-station" placeholder="OO주유소"></div>
+            <div class="fg"><label>비고</label><input type="text" id="fu-note" placeholder="메모"></div>
+          </div>
+          <button class="btn-save" onclick="saveFuel()">저장</button>
         </div>
-
-        <div class="section-box">
-          <h3>주유 이력</h3>
-          <div class="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>일자</th>
-                  <th>주유량 (L)</th>
-                  <th>단가 (원/L)</th>
-                  <th>총 금액 (원)</th>
-                  <th>주유소</th>
-                  <th>비고</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="fuel-tbody"></tbody>
-            </table>
-          </div>
+        <div class="section">
+          <div class="section-title">주유 이력</div>
+          <div class="rec-list" id="fuel-list"></div>
         </div>
       </div>
     </div>
+
+  </div><!-- /content -->
+
+  <!-- Bottom Nav -->
+  <nav id="bottom-nav">
+    <button class="nav-btn active" data-v="eq" onclick="switchView('eq')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
+      </svg>
+      장비
+    </button>
+    <button class="nav-btn" data-v="ops" onclick="switchView('ops')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      가동
+    </button>
+    <button class="nav-btn" data-v="maint" onclick="switchView('maint')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+      정비
+    </button>
+    <button class="nav-btn" data-v="fuel" onclick="switchView('fuel')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 22V8l9-6 9 6v14H3z"/><path d="M9 22v-6h6v6"/>
+      </svg>
+      주유
+    </button>
+  </nav>
+</div>
+
+<!-- FAB -->
+<button id="fab" onclick="openSheet()">+</button>
+
+<!-- Sheet: Add Equipment -->
+<div id="sheet-bg" class="sheet-bg hidden">
+  <div class="sheet">
+    <div class="sheet-drag"></div>
+    <div class="sheet-title">장비 등록</div>
+    <div class="fg">
+      <label>구분 (종류) *</label>
+      <select id="eq-type">
+        <option value="">선택하세요</option>
+        <option>포크레인</option><option>지게차</option><option>크레인</option>
+        <option>불도저</option><option>로더</option><option>덤프트럭</option>
+        <option>롤러</option><option>기타</option>
+      </select>
+    </div>
+    <div class="fg"><label>모델명 *</label><input type="text" id="eq-model" placeholder="예: HD1200"></div>
+    <div class="row2">
+      <div class="fg"><label>장비 이름 / 별칭</label><input type="text" id="eq-name" placeholder="예: 1호기"></div>
+      <div class="fg"><label>관리번호</label><input type="text" id="eq-serial" placeholder="선택 사항"></div>
+    </div>
+    <button class="btn-save" onclick="addEquipment()">등록</button>
+    <button class="btn-cancel" onclick="closeSheet()">취소</button>
   </div>
 </div>
 
-<!-- Modal: Add Equipment -->
-<div id="modal-add-eq" class="modal-backdrop hidden">
-  <div class="modal">
-    <h2>장비 등록</h2>
-    <div class="form-row" style="grid-template-columns: 1fr 1fr;">
-      <div class="form-group">
-        <label>구분 (종류) *</label>
-        <select id="eq-type">
-          <option value="">선택하세요</option>
-          <option>포크레인</option>
-          <option>지게차</option>
-          <option>크레인</option>
-          <option>불도저</option>
-          <option>로더</option>
-          <option>덤프트럭</option>
-          <option>지게차</option>
-          <option>롤러</option>
-          <option>기타</option>
-        </select>
-      </div>
-      <div class="form-group">
-        <label>모델명 *</label>
-        <input type="text" id="eq-model" placeholder="예: HD1200">
-      </div>
-      <div class="form-group">
-        <label>장비 이름 / 별칭</label>
-        <input type="text" id="eq-name" placeholder="예: 1호기">
-      </div>
-      <div class="form-group">
-        <label>관리번호 / 차대번호</label>
-        <input type="text" id="eq-serial" placeholder="선택 사항">
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-cancel" onclick="closeModal()">취소</button>
-      <button class="btn-primary" onclick="addEquipment()">등록</button>
-    </div>
-  </div>
-</div>
-
-<div id="notice"></div>
+<div id="toast"></div>
 
 <script>
-const EQ_ICONS = {
-  '포크레인': '🦺', '지게차': '🏗', '크레인': '🔧', '불도저': '🚜',
-  '로더': '🚛', '덤프트럭': '🚚', '롤러': '⚙', '기타': '🔩'
+const ICONS = {
+  '포크레인':'🦺','지게차':'🏗','크레인':'🔧','불도저':'🚜',
+  '로더':'🚛','덤프트럭':'🚚','롤러':'⚙','기타':'🔩'
 };
 
-let currentEqId = null;
-let equipmentList = [];
+let eqId = null, eqList = [];
 
-// ── Utility ──────────────────────────────────────────────────────────────────
-
-function showNotice(msg, isError = false) {
-  const el = document.getElementById('notice');
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function toast(msg, err=false) {
+  const el = document.getElementById('toast');
   el.textContent = msg;
-  el.className = isError ? 'error show' : 'show';
-  setTimeout(() => el.className = '', 2500);
+  el.className = err ? 'err show' : 'show';
+  setTimeout(() => el.className = '', 2400);
 }
-
 function fmt(n) { return Number(n).toLocaleString('ko-KR'); }
-function today() { return new Date().toISOString().slice(0, 10); }
-
+function today() { return new Date().toISOString().slice(0,10); }
 async function api(method, path, body) {
-  const opts = { method, headers: { 'Content-Type': 'application/json' } };
+  const opts = { method, headers:{'Content-Type':'application/json'} };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(path, opts);
   const data = await res.json();
@@ -465,300 +459,257 @@ async function api(method, path, body) {
   return data;
 }
 
+// ── View switching ────────────────────────────────────────────────────────────
+function switchView(v) {
+  document.querySelectorAll('.view').forEach(el => el.classList.remove('active'));
+  document.getElementById('view-' + v).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.v === v));
+  document.getElementById('fab').classList.toggle('hidden', v !== 'eq');
+  if (eqId) {
+    if (v === 'ops')   loadOps();
+    if (v === 'maint') loadMaint();
+    if (v === 'fuel')  loadFuel();
+  }
+}
+
 // ── Equipment ─────────────────────────────────────────────────────────────────
-
-async function loadEquipment() {
-  equipmentList = await api('GET', '/api/equipment');
-  renderEquipmentList();
+async function loadEqList() {
+  eqList = await api('GET', '/api/equipment');
+  renderEqList();
 }
 
-function renderEquipmentList() {
-  const container = document.getElementById('eq-list');
-  container.innerHTML = '';
-
+function renderEqList() {
+  const c = document.getElementById('eq-container');
+  if (!eqList.length) {
+    c.innerHTML = '<div class="empty-hero"><div class="icon">🏗</div><p>등록된 장비가 없습니다.<br>오른쪽 하단 <b>+</b> 버튼으로 추가하세요.</p></div>';
+    return;
+  }
   const groups = {};
-  equipmentList.forEach(eq => {
-    if (!groups[eq.type]) groups[eq.type] = [];
-    groups[eq.type].push(eq);
-  });
-
-  Object.entries(groups).forEach(([type, items]) => {
-    const title = document.createElement('div');
-    title.className = 'eq-group-title';
-    title.textContent = type;
-    container.appendChild(title);
-
-    items.forEach(eq => {
-      const div = document.createElement('div');
-      div.className = 'eq-item' + (eq.id === currentEqId ? ' active' : '');
-      div.dataset.id = eq.id;
-      div.innerHTML = `
-        <span class="eq-icon">${EQ_ICONS[eq.type] || '⚙'}</span>
-        <div class="eq-info">
-          <div class="eq-model">${eq.model}${eq.name ? ` <span style="color:var(--muted);font-weight:400">(${eq.name})</span>` : ''}</div>
-          ${eq.serial_number ? `<div class="eq-name">${eq.serial_number}</div>` : ''}
+  eqList.forEach(e => { (groups[e.type] = groups[e.type] || []).push(e); });
+  c.innerHTML = Object.entries(groups).map(([type, items]) =>
+    `<div class="eq-group-label">${type}</div>` +
+    items.map(eq => `
+      <div class="eq-card${eq.id===eqId?' active':''}" onclick="selectEq(${eq.id})">
+        <div class="eq-card-icon">${ICONS[eq.type]||'⚙'}</div>
+        <div class="eq-card-info">
+          <div class="eq-card-model">${eq.model}${eq.name?` <span style="font-weight:400;color:var(--muted)">(${eq.name})</span>`:''}</div>
+          <div class="eq-card-sub">${eq.serial_number||eq.type}</div>
         </div>
-        <button class="eq-del" title="삭제" onclick="deleteEquipment(event, ${eq.id})">✕</button>`;
-      div.onclick = () => selectEquipment(eq);
-      container.appendChild(div);
-    });
-  });
+        <button class="eq-del-btn" onclick="event.stopPropagation();delEq(${eq.id})">✕</button>
+      </div>`).join('')
+  ).join('');
 }
 
-function selectEquipment(eq) {
-  currentEqId = eq.id;
-  document.getElementById('empty-state').style.display = 'none';
-  const view = document.getElementById('eq-view');
-  view.style.display = 'flex';
-  document.getElementById('eq-title').textContent =
-    `${EQ_ICONS[eq.type] || '⚙'} ${eq.type} · ${eq.model}${eq.name ? ` (${eq.name})` : ''}`;
-  document.getElementById('eq-meta').textContent =
-    eq.serial_number ? `관리번호: ${eq.serial_number}` : '';
+function selectEq(id) {
+  eqId = id;
+  const eq = eqList.find(e => e.id === id);
+  document.getElementById('hdr-icon').textContent = ICONS[eq.type] || '⚙';
+  document.getElementById('hdr-name').textContent = `${eq.model}${eq.name?` (${eq.name})`:''}`;
+  document.getElementById('hdr-meta').textContent = eq.serial_number ? `관리번호: ${eq.serial_number}` : eq.type;
 
-  // Set default dates
-  const end = today();
-  const start = end.slice(0, 7) + '-01';
-  document.getElementById('filter-start').value = start;
-  document.getElementById('filter-end').value   = end;
-  document.getElementById('op-date').value       = end;
-  document.getElementById('maint-date').value    = end;
-  document.getElementById('fuel-date').value     = end;
+  const end = today(), start = end.slice(0,7)+'-01';
+  document.getElementById('f-start').value  = start;
+  document.getElementById('f-end').value    = end;
+  document.getElementById('op-date').value  = end;
+  document.getElementById('m-date').value   = end;
+  document.getElementById('fu-date').value  = end;
 
-  renderEquipmentList();
-  loadCurrentTab();
+  ['ops','maint','fuel'].forEach(v => {
+    document.getElementById('no-eq-'+v).style.display  = 'none';
+    document.getElementById(v+'-body').style.display    = 'block';
+  });
+  renderEqList();
+  switchView('ops');
 }
 
 async function addEquipment() {
-  const type   = document.getElementById('eq-type').value;
-  const model  = document.getElementById('eq-model').value.trim();
-  const name   = document.getElementById('eq-name').value.trim();
-  const serial = document.getElementById('eq-serial').value.trim();
-  if (!type || !model) { showNotice('구분과 모델명을 입력해주세요.', true); return; }
+  const type=document.getElementById('eq-type').value,
+        model=document.getElementById('eq-model').value.trim(),
+        name=document.getElementById('eq-name').value.trim(),
+        serial=document.getElementById('eq-serial').value.trim();
+  if (!type||!model) { toast('구분과 모델명을 입력해주세요.',true); return; }
   try {
-    await api('POST', '/api/equipment', { type, model, name, serial_number: serial });
-    showNotice('장비가 등록되었습니다.');
-    closeModal();
-    await loadEquipment();
-  } catch (e) { showNotice(e.message, true); }
+    await api('POST','/api/equipment',{type,model,name,serial_number:serial});
+    toast('장비가 등록되었습니다.');
+    closeSheet();
+    await loadEqList();
+  } catch(e) { toast(e.message,true); }
 }
 
-async function deleteEquipment(e, id) {
-  e.stopPropagation();
+async function delEq(id) {
   if (!confirm('장비를 삭제하면 모든 관련 데이터가 삭제됩니다. 삭제하시겠습니까?')) return;
   try {
-    await api('DELETE', `/api/equipment/${id}`);
-    if (currentEqId === id) {
-      currentEqId = null;
-      document.getElementById('empty-state').style.display = 'flex';
-      document.getElementById('eq-view').style.display = 'none';
+    await api('DELETE',`/api/equipment/${id}`);
+    if (eqId===id) {
+      eqId=null;
+      document.getElementById('hdr-icon').textContent='⚙';
+      document.getElementById('hdr-name').textContent='중장비 관리';
+      document.getElementById('hdr-meta').textContent='장비를 선택하세요';
+      ['ops','maint','fuel'].forEach(v => {
+        document.getElementById('no-eq-'+v).style.display='';
+        document.getElementById(v+'-body').style.display='none';
+      });
     }
-    showNotice('삭제되었습니다.');
-    await loadEquipment();
-  } catch (e) { showNotice(e.message, true); }
-}
-
-// ── Tabs ──────────────────────────────────────────────────────────────────────
-
-let activeTab = 'operations';
-
-function switchTab(tab) {
-  activeTab = tab;
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['operations', 'maintenance', 'fuel'];
-    b.classList.toggle('active', names[i] === tab);
-  });
-  document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
-  document.getElementById(`tab-${tab}`).classList.add('active');
-  loadCurrentTab();
-}
-
-function loadCurrentTab() {
-  if (activeTab === 'operations') loadOperations();
-  else if (activeTab === 'maintenance') loadMaintenance();
-  else if (activeTab === 'fuel') loadFuel();
-}
-
-function applyFilter() { loadCurrentTab(); }
-
-function getFilter() {
-  return {
-    start: document.getElementById('filter-start').value,
-    end:   document.getElementById('filter-end').value,
-  };
+    toast('삭제되었습니다.');
+    await loadEqList();
+  } catch(e) { toast(e.message,true); }
 }
 
 // ── Operations ────────────────────────────────────────────────────────────────
+function applyFilter() { loadOps(); }
 
-async function loadOperations() {
-  if (!currentEqId) return;
-  const { start, end } = getFilter();
-  const data = await api('GET', `/api/equipment/${currentEqId}/operations?start=${start}&end=${end}`);
-  document.getElementById('cum-hours').textContent = fmt(data.cumulative.total_hours);
-  document.getElementById('cum-dist').textContent  = fmt(data.cumulative.total_distance);
-
-  const tbody = document.getElementById('op-tbody');
-  if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">가동 현황 데이터가 없습니다.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = data.records.map(r => `
-    <tr>
-      <td>${r.date}</td>
-      <td>${fmt(r.operating_hours)} h</td>
-      <td>${fmt(r.operating_distance)} km</td>
-      <td>${r.notes || '-'}</td>
-      <td><button class="btn-del" onclick="deleteOperation(${r.id})">🗑</button></td>
-    </tr>`).join('');
+async function loadOps() {
+  if (!eqId) return;
+  const s=document.getElementById('f-start').value, e=document.getElementById('f-end').value;
+  const data = await api('GET',`/api/equipment/${eqId}/operations?start=${s}&end=${e}`);
+  document.getElementById('cum-h').textContent = fmt(data.cumulative.total_hours);
+  document.getElementById('cum-d').textContent = fmt(data.cumulative.total_distance);
+  const el = document.getElementById('op-list');
+  el.innerHTML = data.records.length
+    ? data.records.map(r=>`
+        <div class="rec-item">
+          <div class="rec-info">
+            <div class="rec-date">${r.date}</div>
+            <div class="rec-main">${fmt(r.operating_hours)} h · ${fmt(r.operating_distance)} km</div>
+            ${r.notes?`<div class="rec-sub">${r.notes}</div>`:''}
+          </div>
+          <button class="rec-del" onclick="delOp(${r.id})">🗑</button>
+        </div>`).join('')
+    : '<div class="empty-msg">가동 현황 데이터가 없습니다.</div>';
 }
 
-async function saveOperation() {
-  if (!currentEqId) return;
-  const date   = document.getElementById('op-date').value;
-  const hours  = document.getElementById('op-hours').value;
-  const dist   = document.getElementById('op-dist').value;
-  const notes  = document.getElementById('op-notes').value;
-  if (!date) { showNotice('날짜를 입력해주세요.', true); return; }
+async function saveOp() {
+  if (!eqId) return;
+  const date=document.getElementById('op-date').value;
+  if (!date) { toast('날짜를 입력해주세요.',true); return; }
   try {
-    await api('POST', `/api/equipment/${currentEqId}/operations`,
-      { date, operating_hours: hours || 0, operating_distance: dist || 0, notes });
-    showNotice('저장되었습니다.');
-    document.getElementById('op-hours').value = '';
-    document.getElementById('op-dist').value  = '';
-    document.getElementById('op-notes').value = '';
-    loadOperations();
-  } catch (e) { showNotice(e.message, true); }
+    await api('POST',`/api/equipment/${eqId}/operations`,{
+      date,
+      operating_hours: document.getElementById('op-h').value||0,
+      operating_distance: document.getElementById('op-d').value||0,
+      notes: document.getElementById('op-note').value
+    });
+    toast('저장되었습니다.');
+    ['op-h','op-d','op-note'].forEach(id=>document.getElementById(id).value='');
+    loadOps();
+  } catch(e) { toast(e.message,true); }
 }
 
-async function deleteOperation(id) {
+async function delOp(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE', `/api/equipment/${currentEqId}/operations/${id}`);
-  showNotice('삭제되었습니다.');
-  loadOperations();
+  await api('DELETE',`/api/equipment/${eqId}/operations/${id}`);
+  toast('삭제되었습니다.'); loadOps();
 }
 
 // ── Maintenance ───────────────────────────────────────────────────────────────
-
-async function loadMaintenance() {
-  if (!currentEqId) return;
-  const data = await api('GET', `/api/equipment/${currentEqId}/maintenance`);
+async function loadMaint() {
+  if (!eqId) return;
+  const data = await api('GET',`/api/equipment/${eqId}/maintenance`);
   document.getElementById('maint-total').textContent = fmt(data.total_cost);
-
-  const tbody = document.getElementById('maint-tbody');
-  if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-msg">정비 내역이 없습니다.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = data.records.map(r => `
-    <tr>
-      <td>${r.date}</td>
-      <td>${r.description}</td>
-      <td>${r.cost ? fmt(r.cost) + ' 원' : '-'}</td>
-      <td>${r.mechanic || '-'}</td>
-      <td>${r.notes || '-'}</td>
-      <td><button class="btn-del" onclick="deleteMaintenance(${r.id})">🗑</button></td>
-    </tr>`).join('');
+  const el = document.getElementById('maint-list');
+  el.innerHTML = data.records.length
+    ? data.records.map(r=>`
+        <div class="rec-item">
+          <div class="rec-info">
+            <div class="rec-date">${r.date}${r.mechanic?` · ${r.mechanic}`:''}</div>
+            <div class="rec-main">${r.description}</div>
+            <div class="rec-sub">${r.cost?fmt(r.cost)+' 원':''}${r.notes?(r.cost?' · ':'')+r.notes:''}</div>
+          </div>
+          <button class="rec-del" onclick="delMaint(${r.id})">🗑</button>
+        </div>`).join('')
+    : '<div class="empty-msg">정비 내역이 없습니다.</div>';
 }
 
-async function saveMaintenance() {
-  if (!currentEqId) return;
-  const date     = document.getElementById('maint-date').value;
-  const desc     = document.getElementById('maint-desc').value.trim();
-  const cost     = document.getElementById('maint-cost').value;
-  const mechanic = document.getElementById('maint-mechanic').value.trim();
-  const notes    = document.getElementById('maint-notes').value.trim();
-  if (!date || !desc) { showNotice('날짜와 정비 내역을 입력해주세요.', true); return; }
+async function saveMaint() {
+  if (!eqId) return;
+  const date=document.getElementById('m-date').value,
+        desc=document.getElementById('m-desc').value.trim();
+  if (!date||!desc) { toast('날짜와 정비 내역을 입력해주세요.',true); return; }
   try {
-    await api('POST', `/api/equipment/${currentEqId}/maintenance`,
-      { date, description: desc, cost: cost || 0, mechanic, notes });
-    showNotice('저장되었습니다.');
-    ['maint-desc','maint-cost','maint-mechanic','maint-notes'].forEach(id => document.getElementById(id).value = '');
-    loadMaintenance();
-  } catch (e) { showNotice(e.message, true); }
+    await api('POST',`/api/equipment/${eqId}/maintenance`,{
+      date, description:desc,
+      cost: document.getElementById('m-cost').value||0,
+      mechanic: document.getElementById('m-mech').value.trim(),
+      notes: document.getElementById('m-note').value.trim()
+    });
+    toast('저장되었습니다.');
+    ['m-desc','m-cost','m-mech','m-note'].forEach(id=>document.getElementById(id).value='');
+    loadMaint();
+  } catch(e) { toast(e.message,true); }
 }
 
-async function deleteMaintenance(id) {
+async function delMaint(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE', `/api/equipment/${currentEqId}/maintenance/${id}`);
-  showNotice('삭제되었습니다.');
-  loadMaintenance();
+  await api('DELETE',`/api/equipment/${eqId}/maintenance/${id}`);
+  toast('삭제되었습니다.'); loadMaint();
 }
 
 // ── Fuel ──────────────────────────────────────────────────────────────────────
-
-function calcFuelTotal() {
-  const amt   = parseFloat(document.getElementById('fuel-amount').value) || 0;
-  const price = parseInt(document.getElementById('fuel-unit-price').value) || 0;
-  if (amt && price) document.getElementById('fuel-total').value = Math.round(amt * price);
+function calcFuel() {
+  const a=parseFloat(document.getElementById('fu-amt').value)||0,
+        p=parseInt(document.getElementById('fu-price').value)||0;
+  if (a&&p) document.getElementById('fu-total').value=Math.round(a*p);
 }
 
 async function loadFuel() {
-  if (!currentEqId) return;
-  const data = await api('GET', `/api/equipment/${currentEqId}/fuel`);
-  document.getElementById('fuel-total-amt').textContent  = fmt(data.total_amount);
-  document.getElementById('fuel-total-cost').textContent = fmt(data.total_cost);
-
-  const tbody = document.getElementById('fuel-tbody');
-  if (!data.records.length) {
-    tbody.innerHTML = '<tr><td colspan="7" class="empty-msg">주유 내역이 없습니다.</td></tr>';
-    return;
-  }
-  tbody.innerHTML = data.records.map(r => `
-    <tr>
-      <td>${r.date}</td>
-      <td>${fmt(r.amount)} L</td>
-      <td>${r.unit_price ? fmt(r.unit_price) : '-'}</td>
-      <td>${r.total_cost ? fmt(r.total_cost) + ' 원' : '-'}</td>
-      <td>${r.station || '-'}</td>
-      <td>${r.notes || '-'}</td>
-      <td><button class="btn-del" onclick="deleteFuel(${r.id})">🗑</button></td>
-    </tr>`).join('');
+  if (!eqId) return;
+  const data = await api('GET',`/api/equipment/${eqId}/fuel`);
+  document.getElementById('fuel-amt').textContent  = fmt(data.total_amount);
+  document.getElementById('fuel-cost').textContent = fmt(data.total_cost);
+  const el = document.getElementById('fuel-list');
+  el.innerHTML = data.records.length
+    ? data.records.map(r=>`
+        <div class="rec-item">
+          <div class="rec-info">
+            <div class="rec-date">${r.date}${r.station?` · ${r.station}`:''}</div>
+            <div class="rec-main">${fmt(r.amount)} L${r.unit_price?` · ${fmt(r.unit_price)}원/L`:''}</div>
+            <div class="rec-sub">${r.total_cost?fmt(r.total_cost)+' 원':''}${r.notes?(r.total_cost?' · ':'')+r.notes:''}</div>
+          </div>
+          <button class="rec-del" onclick="delFuel(${r.id})">🗑</button>
+        </div>`).join('')
+    : '<div class="empty-msg">주유 내역이 없습니다.</div>';
 }
 
 async function saveFuel() {
-  if (!currentEqId) return;
-  const date       = document.getElementById('fuel-date').value;
-  const amount     = document.getElementById('fuel-amount').value;
-  const unit_price = document.getElementById('fuel-unit-price').value;
-  const total_cost = document.getElementById('fuel-total').value;
-  const station    = document.getElementById('fuel-station').value.trim();
-  const notes      = document.getElementById('fuel-notes').value.trim();
-  if (!date || !amount) { showNotice('날짜와 주유량을 입력해주세요.', true); return; }
+  if (!eqId) return;
+  const date=document.getElementById('fu-date').value,
+        amount=document.getElementById('fu-amt').value;
+  if (!date||!amount) { toast('날짜와 주유량을 입력해주세요.',true); return; }
   try {
-    await api('POST', `/api/equipment/${currentEqId}/fuel`,
-      { date, amount, unit_price: unit_price || 0, total_cost: total_cost || 0, station, notes });
-    showNotice('저장되었습니다.');
-    ['fuel-amount','fuel-unit-price','fuel-total','fuel-station','fuel-notes'].forEach(id => document.getElementById(id).value = '');
+    await api('POST',`/api/equipment/${eqId}/fuel`,{
+      date, amount,
+      unit_price: document.getElementById('fu-price').value||0,
+      total_cost: document.getElementById('fu-total').value||0,
+      station:    document.getElementById('fu-station').value.trim(),
+      notes:      document.getElementById('fu-note').value.trim()
+    });
+    toast('저장되었습니다.');
+    ['fu-amt','fu-price','fu-total','fu-station','fu-note'].forEach(id=>document.getElementById(id).value='');
     loadFuel();
-  } catch (e) { showNotice(e.message, true); }
+  } catch(e) { toast(e.message,true); }
 }
 
-async function deleteFuel(id) {
+async function delFuel(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE', `/api/equipment/${currentEqId}/fuel/${id}`);
-  showNotice('삭제되었습니다.');
-  loadFuel();
+  await api('DELETE',`/api/equipment/${eqId}/fuel/${id}`);
+  toast('삭제되었습니다.'); loadFuel();
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
-
-document.getElementById('btn-add-eq').onclick = () => {
-  document.getElementById('eq-type').value   = '';
-  document.getElementById('eq-model').value  = '';
-  document.getElementById('eq-name').value   = '';
-  document.getElementById('eq-serial').value = '';
-  document.getElementById('modal-add-eq').classList.remove('hidden');
-};
-
-function closeModal() {
-  document.getElementById('modal-add-eq').classList.add('hidden');
+// ── Sheet ─────────────────────────────────────────────────────────────────────
+function openSheet() {
+  ['eq-type','eq-model','eq-name','eq-serial'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('sheet-bg').classList.remove('hidden');
 }
+function closeSheet() { document.getElementById('sheet-bg').classList.add('hidden'); }
+document.getElementById('sheet-bg').addEventListener('click', e => { if(e.target===e.currentTarget) closeSheet(); });
 
-document.getElementById('modal-add-eq').addEventListener('click', e => {
-  if (e.target === e.currentTarget) closeModal();
-});
+// ── PWA ───────────────────────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch(()=>{});
+}
 
 // ── Init ──────────────────────────────────────────────────────────────────────
-loadEquipment();
+loadEqList();
 </script>
 </body>
 </html>
