@@ -152,6 +152,19 @@
 
   <!-- 요약 탭 -->
   <div class="tab-panel active" id="tab-summary">
+    <div class="card">
+      <div class="form-group" style="margin-bottom:14px;">
+        <label class="form-label">장비 이름</label>
+        <div style="display:flex; gap:8px;">
+          <input class="form-input" id="inp-equipment-name-dash" placeholder="예: 1호기 지게차" style="flex:1;">
+          <button class="btn btn-success" style="width:auto; padding:0 18px;" onclick="saveEquipmentName('inp-equipment-name-dash')">저장</button>
+        </div>
+      </div>
+      <label class="quick-check-row" for="chk-fuel-quick-summary" style="margin-bottom:0;">
+        <input type="checkbox" id="chk-fuel-quick-summary">
+        <span>⛽ 오늘 주유함 (상세 없이 체크만)</span>
+      </label>
+    </div>
     <div class="kpi-grid">
       <div class="kpi hours">
         <div class="kpi-label">당일 사용시간</div>
@@ -448,6 +461,7 @@
   // ── 요약 ──────────────────────────────────────────────────────────────────────
   function loadSummary() {
     const date = selectedDate();
+    syncFuelQuickUI();
     const usage = computeDailyUsage(date);
     const prevUsage = computeDailyUsage(shiftDate(date, -1));
 
@@ -547,33 +561,31 @@
     loadUsageTab();
   });
 
-  // ── 주유 ──────────────────────────────────────────────────────────────────────
-  function loadFuelTab() {
-    const date = selectedDate();
-    const quickRec = DB.fuelLogs.find(f => f.date === date && f.quick);
-    document.getElementById('chk-fuel-quick').checked = !!quickRec;
-    setFuelFormDisabled(!!quickRec);
+  // ── 주유 (체크만 기록, 요약/주유 탭 공용) ────────────────────────────────────────
+  const FUEL_QUICK_CHECKBOX_IDS = ['chk-fuel-quick', 'chk-fuel-quick-summary'];
+  function isFuelQuickChecked(date) { return DB.fuelLogs.some(f => f.date === date && f.quick); }
+  function syncFuelQuickUI() {
+    const checked = isFuelQuickChecked(selectedDate());
+    FUEL_QUICK_CHECKBOX_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.checked = checked; });
+    setFuelFormDisabled(checked);
   }
+  function toggleFuelQuick(checked) {
+    const date = selectedDate();
+    DB.fuelLogs = DB.fuelLogs.filter(f => !(f.date === date && f.quick));
+    if (checked) DB.fuelLogs.push({ id: newId(), date, liters: 0, unitPrice: 0, amount: 0, memo: '', quick: true, created_at: new Date().toISOString() });
+    saveDB();
+    syncFuelQuickUI();
+    showToast(checked ? '⛽ 주유함으로 체크되었습니다' : '체크가 해제되었습니다');
+  }
+  FUEL_QUICK_CHECKBOX_IDS.forEach(id => document.getElementById(id).addEventListener('change', e => toggleFuelQuick(e.target.checked)));
+
+  function loadFuelTab() { syncFuelQuickUI(); }
   function setFuelFormDisabled(disabled) {
     ['inp-liters','inp-unit-price','inp-fuel-memo','btn-save-fuel'].forEach(id => {
       document.getElementById(id).disabled = disabled;
     });
     document.getElementById('btn-save-fuel').style.opacity = disabled ? '0.5' : '1';
   }
-  document.getElementById('chk-fuel-quick').addEventListener('change', (e) => {
-    const date = selectedDate();
-    DB.fuelLogs = DB.fuelLogs.filter(f => !(f.date === date && f.quick));
-    if (e.target.checked) {
-      DB.fuelLogs.push({ id: newId(), date, liters: 0, unitPrice: 0, amount: 0, memo: '', quick: true, created_at: new Date().toISOString() });
-      saveDB();
-      setFuelFormDisabled(true);
-      showToast('⛽ 주유함으로 체크되었습니다');
-    } else {
-      saveDB();
-      setFuelFormDisabled(false);
-      showToast('체크가 해제되었습니다');
-    }
-  });
 
   ['inp-liters','inp-unit-price'].forEach(id => document.getElementById(id).addEventListener('input', updateFuelPreview));
   function updateFuelPreview() {
@@ -652,23 +664,26 @@
   }
 
   // ── 장비 이름 ─────────────────────────────────────────────────────────────────
+  const EQUIPMENT_NAME_INPUT_IDS = ['inp-equipment-name', 'inp-equipment-name-dash'];
   function updateAppTitle() {
     const title = DB.equipmentName ? `🚜 ${DB.equipmentName}` : '🚜 지게차 관리';
     document.getElementById('app-title').textContent = title;
     document.title = title;
+    EQUIPMENT_NAME_INPUT_IDS.forEach(id => { const el = document.getElementById(id); if (el) el.value = DB.equipmentName || ''; });
   }
-  function saveEquipmentName() {
-    DB.equipmentName = document.getElementById('inp-equipment-name').value.trim();
+  function saveEquipmentName(sourceId) {
+    const el = document.getElementById(sourceId || 'inp-equipment-name');
+    DB.equipmentName = el.value.trim();
     saveDB();
     updateAppTitle();
     showToast('✅ 장비 이름이 저장되었습니다');
   }
+  document.getElementById('inp-equipment-name-dash').addEventListener('keydown', e => {
+    if (e.key === 'Enter') saveEquipmentName('inp-equipment-name-dash');
+  });
 
   // ── 설정 / 백업 · 복원 ─────────────────────────────────────────────────────────
-  function openSettings()  {
-    document.getElementById('inp-equipment-name').value = DB.equipmentName || '';
-    document.getElementById('settings-modal').classList.remove('hidden');
-  }
+  function openSettings()  { document.getElementById('settings-modal').classList.remove('hidden'); }
   function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
 
   function exportBackup() {
