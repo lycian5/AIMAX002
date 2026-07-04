@@ -130,6 +130,8 @@
     .modal-overlay.hidden { display:none; }
     .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
     .modal-hint { font-size:0.78rem; color:var(--sub); margin:-4px 0 8px; line-height:1.5; }
+    .install-section { background:#f8fafc; border-radius:10px; padding:12px 14px; margin-bottom:4px; }
+    .install-step-title { font-size:0.85rem; font-weight:700; color:var(--text); margin-bottom:6px; }
   </style>
 </head>
 <body>
@@ -142,6 +144,7 @@
         <span>📅</span>
         <input type="date" id="dateSelect">
       </div>
+      <button class="icon-btn" onclick="openInstallGuide()" title="앱 설치 방법">📲</button>
       <button class="icon-btn" onclick="openSettings()">⚙️</button>
     </div>
   </div>
@@ -400,6 +403,27 @@
     <button class="btn btn-fuel" onclick="document.getElementById('import-file').click()">⬆ 백업 가져오기</button>
     <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importBackup(event)">
     <button class="btn btn-plain" onclick="closeSettings()">닫기</button>
+  </div>
+</div>
+
+<!-- 앱 설치 방법 안내 모달 -->
+<div id="install-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="card-title" style="margin-bottom:0">📲 앱 설치 방법</div>
+
+    <div class="install-section">
+      <div class="install-step-title">방법 1 · 홈 화면에 추가 (가장 간편)</div>
+      <p class="modal-hint" style="margin:0 0 6px;"><b>Android(Chrome)</b>: 오른쪽 위 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"</p>
+      <p class="modal-hint" style="margin:0;"><b>iPhone(Safari)</b>: 하단 공유 버튼(⬆️) → "홈 화면에 추가"</p>
+    </div>
+
+    <div class="install-section">
+      <div class="install-step-title">방법 2 · 설치 파일(APK) 만들기</div>
+      <p class="modal-hint" style="margin:0 0 10px;">pwabuilder.com 접속 → 이 사이트 주소 입력 → "Android" 패키지 생성 → 다운로드한 APK를 폰에 설치(출처 불명 앱 설치 허용 필요)</p>
+      <button class="btn btn-fuel" onclick="copySiteUrl()">🔗 이 사이트 주소 복사</button>
+    </div>
+
+    <button class="btn btn-plain" onclick="closeInstallGuide()">닫기</button>
   </div>
 </div>
 
@@ -808,6 +832,20 @@
   // ── 설정 / 백업 · 복원 ─────────────────────────────────────────────────────────
   function openSettings()  { document.getElementById('settings-modal').classList.remove('hidden'); }
   function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
+
+  // ── 앱 설치 방법 안내 ─────────────────────────────────────────────────────────
+  function openInstallGuide()  { document.getElementById('install-modal').classList.remove('hidden'); }
+  function closeInstallGuide() { document.getElementById('install-modal').classList.add('hidden'); }
+  function copySiteUrl() {
+    const url = window.location.origin + '/';
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url)
+        .then(() => showToast('🔗 주소를 복사했습니다'))
+        .catch(() => showToast('⚠️ 복사에 실패했습니다. 직접 입력해주세요: ' + url));
+    } else {
+      showToast('⚠️ 자동 복사 미지원 브라우저입니다. 직접 입력해주세요: ' + url);
+    }
+  }
 
   function exportBackup() {
     const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
