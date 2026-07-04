@@ -1,8 +1,11 @@
-const CACHE = 'forklift-log-v2';
+const CACHE = 'forklift-log-v3';
 const PRECACHE = [
   '/',
   '/manifest.json',
   '/static/icon.svg',
+  '/static/icons/icon-192.png',
+  '/static/icons/icon-512.png',
+  '/static/icons/icon-512-maskable.png',
   'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js'
 ];
 
