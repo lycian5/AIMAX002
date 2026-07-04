@@ -69,10 +69,10 @@ body {
   flex: 1; display: flex; flex-direction: column; align-items: center;
   justify-content: center; gap: 3px; background: none; border: none;
   color: var(--muted); cursor: pointer; font-size: 10px; font-weight: 600;
-  padding: 8px 4px; transition: color 0.15s;
+  padding: 8px 2px; transition: color 0.15s;
 }
 .nav-btn.active { color: var(--accent); }
-.nav-btn svg { width: 22px; height: 22px; }
+.nav-btn svg { width: 20px; height: 20px; }
 
 /* ── FAB ── */
 #fab {
@@ -86,6 +86,14 @@ body {
 }
 #fab:active { transform: scale(0.9); }
 #fab.hidden { display: none; }
+
+/* ── Backup buttons ── */
+.backup-row { display: flex; gap: 8px; margin-bottom: 14px; }
+.backup-btn {
+  flex: 1; padding: 10px; background: var(--card); border: 1px solid var(--border);
+  color: var(--text); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.backup-btn:active { border-color: var(--accent); }
 
 /* ── Equipment cards ── */
 .eq-group-label {
@@ -188,6 +196,7 @@ body {
   background: rgba(239,68,68,0.1); border: none; border-radius: 8px;
   cursor: pointer; color: var(--red); font-size: 14px;
 }
+.rec-amount { text-align: right; flex-shrink: 0; }
 
 /* ── Bottom sheet ── */
 .sheet-bg {
@@ -242,8 +251,49 @@ body {
   <!-- Content -->
   <div id="content">
 
+    <!-- View: Home Dashboard -->
+    <div id="view-home" class="view">
+      <div id="no-eq-home" class="empty-hero">
+        <div class="icon">🏠</div>
+        <p>장비 탭에서 장비를 선택하세요.</p>
+      </div>
+      <div id="home-body" style="display:none">
+        <div class="stat-row">
+          <div class="stat-card">
+            <div class="stat-label">이번달 유지비</div>
+            <div class="stat-value" id="home-cost">0</div>
+            <div class="stat-unit">원</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">현재 계기판</div>
+            <div class="stat-value" id="home-odo">0</div>
+            <div class="stat-unit">km</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">이번달 주행거리</div>
+            <div class="stat-value" id="home-dist">0</div>
+            <div class="stat-unit">km</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">평균 연비</div>
+            <div class="stat-value" id="home-eff">-</div>
+            <div class="stat-unit">km/L</div>
+          </div>
+        </div>
+        <div class="section">
+          <div class="section-title">최근 내역</div>
+          <div class="rec-list" id="home-ledger"></div>
+        </div>
+      </div>
+    </div>
+
     <!-- View: Equipment -->
     <div id="view-eq" class="view active">
+      <div class="backup-row">
+        <button class="backup-btn" onclick="exportBackup()">⬇ 내보내기</button>
+        <button class="backup-btn" onclick="document.getElementById('import-file').click()">⬆ 가져오기</button>
+        <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importBackup(event)">
+      </div>
       <div id="eq-container">
         <div class="empty-hero">
           <div class="icon">🏗</div>
@@ -268,12 +318,12 @@ body {
         </div>
         <div class="stat-row">
           <div class="stat-card">
-            <div class="stat-label">누계 가동시간</div>
+            <div class="stat-label">현재 계기판</div>
             <div class="stat-value" id="cum-h">0</div>
-            <div class="stat-unit">시간 (h)</div>
+            <div class="stat-unit">km</div>
           </div>
           <div class="stat-card">
-            <div class="stat-label">누계 가동거리</div>
+            <div class="stat-label">구간 주행거리</div>
             <div class="stat-value" id="cum-d">0</div>
             <div class="stat-unit">km</div>
           </div>
@@ -282,12 +332,9 @@ body {
           <div class="section-title">가동 현황 입력</div>
           <div class="row2">
             <div class="fg"><label>일자 *</label><input type="date" id="op-date"></div>
-            <div class="fg"><label>가동시간 (h)</label><input type="number" id="op-h" min="0" step="0.1" placeholder="0.0"></div>
+            <div class="fg"><label>가동거리 (km) *</label><input type="number" id="op-d" min="0" step="0.1" placeholder="계기판 누적값 입력"></div>
           </div>
-          <div class="row2">
-            <div class="fg"><label>가동거리 (km)</label><input type="number" id="op-d" min="0" step="0.1" placeholder="0.0"></div>
-            <div class="fg"><label>비고</label><input type="text" id="op-note" placeholder="메모"></div>
-          </div>
+          <div class="fg"><label>비고</label><input type="text" id="op-note" placeholder="메모"></div>
           <button class="btn-save" onclick="saveOp()">저장</button>
         </div>
         <div class="section">
@@ -349,6 +396,11 @@ body {
             <div class="stat-value" id="fuel-cost">0</div>
             <div class="stat-unit">원</div>
           </div>
+          <div class="stat-card wide">
+            <div class="stat-label">평균 연비</div>
+            <div class="stat-value" id="fuel-eff">-</div>
+            <div class="stat-unit">km/L</div>
+          </div>
         </div>
         <div class="section">
           <div class="section-title">주유 입력</div>
@@ -377,6 +429,12 @@ body {
 
   <!-- Bottom Nav -->
   <nav id="bottom-nav">
+    <button class="nav-btn" data-v="home" onclick="switchView('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+      </svg>
+      홈
+    </button>
     <button class="nav-btn active" data-v="eq" onclick="switchView('eq')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M9 3H5a2 2 0 0 0-2 2v4m6-6h10a2 2 0 0 1 2 2v4M9 3v18m0 0h10a2 2 0 0 0 2-2V9M9 21H5a2 2 0 0 1-2-2V9m0 0h18"/>
@@ -439,7 +497,143 @@ const ICONS = {
   '로더':'🚛','덤프트럭':'🚚','롤러':'⚙','기타':'🔩'
 };
 
-let eqId = null, eqList = [];
+// ── Local storage data layer ─────────────────────────────────────────────────
+const STORAGE_KEY = 'heavy_equipment_data';
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const p = JSON.parse(raw);
+      return {
+        equipment:   Array.isArray(p.equipment)   ? p.equipment   : [],
+        operations:  Array.isArray(p.operations)  ? p.operations  : [],
+        maintenance: Array.isArray(p.maintenance) ? p.maintenance : [],
+        fuel:        Array.isArray(p.fuel)        ? p.fuel        : []
+      };
+    }
+  } catch (e) {}
+  return { equipment: [], operations: [], maintenance: [], fuel: [] };
+}
+function saveDB() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
+function newId() { return Date.now() * 1000 + Math.floor(Math.random() * 1000); }
+let DB = loadDB();
+
+// -- Equipment --
+function listEquipment() {
+  return [...DB.equipment].sort((a,b) =>
+    a.type.localeCompare(b.type) || a.model.localeCompare(b.model) || (a.name||'').localeCompare(b.name||''));
+}
+function addEquipmentRecord(type, model, name, serial_number) {
+  const rec = { id:newId(), type, model, name:name||'', serial_number:serial_number||'', created_at:new Date().toISOString() };
+  DB.equipment.push(rec); saveDB(); return rec;
+}
+function deleteEquipmentRecord(id) {
+  DB.equipment   = DB.equipment.filter(e=>e.id!==id);
+  DB.operations  = DB.operations.filter(o=>o.equipment_id!==id);
+  DB.maintenance = DB.maintenance.filter(m=>m.equipment_id!==id);
+  DB.fuel        = DB.fuel.filter(f=>f.equipment_id!==id);
+  saveDB();
+}
+
+// -- Operations (계기판 누적거리) --
+function getOperationsData(eqId, start, end) {
+  const allAsc = DB.operations.filter(o=>o.equipment_id===eqId).sort((a,b)=>a.date.localeCompare(b.date));
+  const currentOdometer = allAsc.length ? allAsc[allAsc.length-1].odometer : 0;
+  let filtered = allAsc;
+  if (start) filtered = filtered.filter(o=>o.date>=start);
+  if (end)   filtered = filtered.filter(o=>o.date<=end);
+  const withDelta = filtered.map((o,i)=>({ ...o, delta: i===0 ? null : +(o.odometer - filtered[i-1].odometer).toFixed(1) }));
+  const periodDistance = filtered.length>=2
+    ? +(filtered[filtered.length-1].odometer - filtered[0].odometer).toFixed(1)
+    : 0;
+  return { records: withDelta.slice().reverse(), current_odometer: currentOdometer, period_distance: periodDistance };
+}
+function saveOperationRecord(eqId, date, odometer, notes) {
+  const others  = DB.operations.filter(o=>o.equipment_id===eqId && o.date!==date);
+  const prevMax = others.reduce((m,o)=>Math.max(m,o.odometer),0);
+  const warning = others.length>0 && odometer < prevMax;
+  const idx = DB.operations.findIndex(o=>o.equipment_id===eqId && o.date===date);
+  if (idx>=0) DB.operations[idx] = { ...DB.operations[idx], odometer, notes };
+  else DB.operations.push({ id:newId(), equipment_id:eqId, date, odometer, notes, created_at:new Date().toISOString() });
+  saveDB();
+  return { warning };
+}
+function deleteOperationRecord(eqId, opId) {
+  DB.operations = DB.operations.filter(o=>!(o.equipment_id===eqId && o.id===opId));
+  saveDB();
+}
+function getOverallDistance(eqId) {
+  const allAsc = DB.operations.filter(o=>o.equipment_id===eqId).sort((a,b)=>a.date.localeCompare(b.date));
+  if (allAsc.length<2) return 0;
+  return Math.max(0, allAsc[allAsc.length-1].odometer - allAsc[0].odometer);
+}
+
+// -- Maintenance --
+function getMaintenanceData(eqId) {
+  const records = DB.maintenance.filter(m=>m.equipment_id===eqId)
+    .sort((a,b)=>b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+  const total_cost = records.reduce((s,m)=>s+(m.cost||0),0);
+  return { records, total_cost };
+}
+function addMaintenanceRecord(eqId,date,description,cost,mechanic,notes) {
+  const rec = { id:newId(), equipment_id:eqId, date, description, cost:cost||0, mechanic:mechanic||'', notes:notes||'', created_at:new Date().toISOString() };
+  DB.maintenance.push(rec); saveDB(); return rec;
+}
+function deleteMaintenanceRecord(eqId, id) {
+  DB.maintenance = DB.maintenance.filter(m=>!(m.equipment_id===eqId && m.id===id));
+  saveDB();
+}
+
+// -- Fuel --
+function getFuelData(eqId) {
+  const records = DB.fuel.filter(f=>f.equipment_id===eqId)
+    .sort((a,b)=>b.date.localeCompare(a.date) || b.created_at.localeCompare(a.created_at));
+  const total_amount = records.reduce((s,f)=>s+(f.amount||0),0);
+  const total_cost   = records.reduce((s,f)=>s+(f.total_cost||0),0);
+  const distance     = getOverallDistance(eqId);
+  const avg_efficiency = (distance>0 && total_amount>0) ? +(distance/total_amount).toFixed(1) : null;
+  return { records, total_amount, total_cost, avg_efficiency };
+}
+function addFuelRecord(eqId,date,amount,unit_price,total_cost,station,notes) {
+  const rec = { id:newId(), equipment_id:eqId, date, amount, unit_price:unit_price||0, total_cost:total_cost||0, station:station||'', notes:notes||'', created_at:new Date().toISOString() };
+  DB.fuel.push(rec); saveDB(); return rec;
+}
+function deleteFuelRecord(eqId,id) {
+  DB.fuel = DB.fuel.filter(f=>!(f.equipment_id===eqId && f.id===id));
+  saveDB();
+}
+
+// -- Home dashboard --
+function getHomeData(eqId) {
+  const monthPrefix = today().slice(0,7);
+  const maintThisMonth = DB.maintenance.filter(m=>m.equipment_id===eqId && m.date.startsWith(monthPrefix)).reduce((s,m)=>s+(m.cost||0),0);
+  const fuelThisMonth  = DB.fuel.filter(f=>f.equipment_id===eqId && f.date.startsWith(monthPrefix)).reduce((s,f)=>s+(f.total_cost||0),0);
+  const monthlyCost = maintThisMonth + fuelThisMonth;
+
+  const opsAsc = DB.operations.filter(o=>o.equipment_id===eqId).sort((a,b)=>a.date.localeCompare(b.date));
+  const currentOdometer = opsAsc.length ? opsAsc[opsAsc.length-1].odometer : 0;
+  const monthStart = monthPrefix + '-01';
+  const baseline = [...opsAsc].reverse().find(o=>o.date < monthStart);
+  const inMonth  = opsAsc.filter(o=>o.date>=monthStart);
+  let monthDistance = 0;
+  if (inMonth.length) {
+    const startOdo = baseline ? baseline.odometer : inMonth[0].odometer;
+    monthDistance = Math.max(0, inMonth[inMonth.length-1].odometer - startOdo);
+  }
+
+  const avgEfficiency = getFuelData(eqId).avg_efficiency;
+
+  const maintItems = DB.maintenance.filter(m=>m.equipment_id===eqId)
+    .map(m=>({ date:m.date, created_at:m.created_at, label:m.description, amount:m.cost||0 }));
+  const fuelItems = DB.fuel.filter(f=>f.equipment_id===eqId)
+    .map(f=>({ date:f.date, created_at:f.created_at, label:'주유', amount:f.total_cost||0 }));
+  const ledgerAsc = [...maintItems, ...fuelItems].sort((a,b)=>a.date.localeCompare(b.date) || a.created_at.localeCompare(b.created_at));
+  let running = 0;
+  const ledger = ledgerAsc.map(item => { running += item.amount; return { ...item, cumulative: running }; }).reverse();
+
+  return { monthlyCost, currentOdometer, monthDistance, avgEfficiency, ledger };
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 function toast(msg, err=false) {
@@ -450,14 +644,8 @@ function toast(msg, err=false) {
 }
 function fmt(n) { return Number(n).toLocaleString('ko-KR'); }
 function today() { return new Date().toISOString().slice(0,10); }
-async function api(method, path, body) {
-  const opts = { method, headers:{'Content-Type':'application/json'} };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(path, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || '오류가 발생했습니다.');
-  return data;
-}
+
+let eqId = null, eqList = [];
 
 // ── View switching ────────────────────────────────────────────────────────────
 function switchView(v) {
@@ -466,6 +654,7 @@ function switchView(v) {
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.v === v));
   document.getElementById('fab').classList.toggle('hidden', v !== 'eq');
   if (eqId) {
+    if (v === 'home')  loadHome();
     if (v === 'ops')   loadOps();
     if (v === 'maint') loadMaint();
     if (v === 'fuel')  loadFuel();
@@ -473,8 +662,8 @@ function switchView(v) {
 }
 
 // ── Equipment ─────────────────────────────────────────────────────────────────
-async function loadEqList() {
-  eqList = await api('GET', '/api/equipment');
+function loadEqList() {
+  eqList = listEquipment();
   renderEqList();
 }
 
@@ -514,63 +703,83 @@ function selectEq(id) {
   document.getElementById('m-date').value   = end;
   document.getElementById('fu-date').value  = end;
 
-  ['ops','maint','fuel'].forEach(v => {
+  ['home','ops','maint','fuel'].forEach(v => {
     document.getElementById('no-eq-'+v).style.display  = 'none';
     document.getElementById(v+'-body').style.display    = 'block';
   });
   renderEqList();
-  switchView('ops');
+  switchView('home');
 }
 
-async function addEquipment() {
+function addEquipment() {
   const type=document.getElementById('eq-type').value,
         model=document.getElementById('eq-model').value.trim(),
         name=document.getElementById('eq-name').value.trim(),
         serial=document.getElementById('eq-serial').value.trim();
   if (!type||!model) { toast('구분과 모델명을 입력해주세요.',true); return; }
-  try {
-    await api('POST','/api/equipment',{type,model,name,serial_number:serial});
-    toast('장비가 등록되었습니다.');
-    closeSheet();
-    await loadEqList();
-  } catch(e) { toast(e.message,true); }
+  addEquipmentRecord(type, model, name, serial);
+  toast('장비가 등록되었습니다.');
+  closeSheet();
+  loadEqList();
 }
 
-async function delEq(id) {
+function delEq(id) {
   if (!confirm('장비를 삭제하면 모든 관련 데이터가 삭제됩니다. 삭제하시겠습니까?')) return;
-  try {
-    await api('DELETE',`/api/equipment/${id}`);
-    if (eqId===id) {
-      eqId=null;
-      document.getElementById('hdr-icon').textContent='⚙';
-      document.getElementById('hdr-name').textContent='중장비 관리';
-      document.getElementById('hdr-meta').textContent='장비를 선택하세요';
-      ['ops','maint','fuel'].forEach(v => {
-        document.getElementById('no-eq-'+v).style.display='';
-        document.getElementById(v+'-body').style.display='none';
-      });
-    }
-    toast('삭제되었습니다.');
-    await loadEqList();
-  } catch(e) { toast(e.message,true); }
+  deleteEquipmentRecord(id);
+  if (eqId===id) {
+    eqId=null;
+    document.getElementById('hdr-icon').textContent='⚙';
+    document.getElementById('hdr-name').textContent='중장비 관리';
+    document.getElementById('hdr-meta').textContent='장비를 선택하세요';
+    ['home','ops','maint','fuel'].forEach(v => {
+      document.getElementById('no-eq-'+v).style.display='';
+      document.getElementById(v+'-body').style.display='none';
+    });
+  }
+  toast('삭제되었습니다.');
+  loadEqList();
+}
+
+// ── Home ──────────────────────────────────────────────────────────────────────
+function loadHome() {
+  if (!eqId) return;
+  const d = getHomeData(eqId);
+  document.getElementById('home-cost').textContent = fmt(d.monthlyCost);
+  document.getElementById('home-odo').textContent  = fmt(d.currentOdometer);
+  document.getElementById('home-dist').textContent = fmt(d.monthDistance);
+  document.getElementById('home-eff').textContent  = d.avgEfficiency!=null ? fmt(d.avgEfficiency) : '-';
+  const el = document.getElementById('home-ledger');
+  el.innerHTML = d.ledger.length
+    ? d.ledger.map(r=>`
+        <div class="rec-item">
+          <div class="rec-info">
+            <div class="rec-date">${r.date}</div>
+            <div class="rec-main">${r.label}</div>
+          </div>
+          <div class="rec-amount">
+            <div class="rec-main" style="color:var(--red)">-${fmt(r.amount)}원</div>
+            <div class="rec-sub">누적 ${fmt(r.cumulative)}원</div>
+          </div>
+        </div>`).join('')
+    : '<div class="empty-msg">정비·주유 내역이 없습니다.</div>';
 }
 
 // ── Operations ────────────────────────────────────────────────────────────────
 function applyFilter() { loadOps(); }
 
-async function loadOps() {
+function loadOps() {
   if (!eqId) return;
   const s=document.getElementById('f-start').value, e=document.getElementById('f-end').value;
-  const data = await api('GET',`/api/equipment/${eqId}/operations?start=${s}&end=${e}`);
-  document.getElementById('cum-h').textContent = fmt(data.cumulative.total_hours);
-  document.getElementById('cum-d').textContent = fmt(data.cumulative.total_distance);
+  const data = getOperationsData(eqId, s, e);
+  document.getElementById('cum-h').textContent = fmt(data.current_odometer);
+  document.getElementById('cum-d').textContent = fmt(data.period_distance);
   const el = document.getElementById('op-list');
   el.innerHTML = data.records.length
     ? data.records.map(r=>`
         <div class="rec-item">
           <div class="rec-info">
             <div class="rec-date">${r.date}</div>
-            <div class="rec-main">${fmt(r.operating_hours)} h · ${fmt(r.operating_distance)} km</div>
+            <div class="rec-main">${fmt(r.odometer)} km${r.delta!=null?` <span style="color:var(--green)">(+${fmt(r.delta)}km)</span>`:''}</div>
             ${r.notes?`<div class="rec-sub">${r.notes}</div>`:''}
           </div>
           <button class="rec-del" onclick="delOp(${r.id})">🗑</button>
@@ -578,33 +787,29 @@ async function loadOps() {
     : '<div class="empty-msg">가동 현황 데이터가 없습니다.</div>';
 }
 
-async function saveOp() {
+function saveOp() {
   if (!eqId) return;
-  const date=document.getElementById('op-date').value;
-  if (!date) { toast('날짜를 입력해주세요.',true); return; }
-  try {
-    await api('POST',`/api/equipment/${eqId}/operations`,{
-      date,
-      operating_hours: document.getElementById('op-h').value||0,
-      operating_distance: document.getElementById('op-d').value||0,
-      notes: document.getElementById('op-note').value
-    });
-    toast('저장되었습니다.');
-    ['op-h','op-d','op-note'].forEach(id=>document.getElementById(id).value='');
-    loadOps();
-  } catch(e) { toast(e.message,true); }
+  const date = document.getElementById('op-date').value;
+  const odoRaw = document.getElementById('op-d').value;
+  if (!date || odoRaw==='') { toast('일자와 가동거리를 입력해주세요.',true); return; }
+  const odometer = parseFloat(odoRaw) || 0;
+  const notes = document.getElementById('op-note').value.trim();
+  const { warning } = saveOperationRecord(eqId, date, odometer, notes);
+  toast(warning ? '저장되었습니다. (계기판 값이 이전 기록보다 낮습니다)' : '저장되었습니다.');
+  document.getElementById('op-d').value=''; document.getElementById('op-note').value='';
+  loadOps();
 }
 
-async function delOp(id) {
+function delOp(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE',`/api/equipment/${eqId}/operations/${id}`);
+  deleteOperationRecord(eqId, id);
   toast('삭제되었습니다.'); loadOps();
 }
 
 // ── Maintenance ───────────────────────────────────────────────────────────────
-async function loadMaint() {
+function loadMaint() {
   if (!eqId) return;
-  const data = await api('GET',`/api/equipment/${eqId}/maintenance`);
+  const data = getMaintenanceData(eqId);
   document.getElementById('maint-total').textContent = fmt(data.total_cost);
   const el = document.getElementById('maint-list');
   el.innerHTML = data.records.length
@@ -620,27 +825,23 @@ async function loadMaint() {
     : '<div class="empty-msg">정비 내역이 없습니다.</div>';
 }
 
-async function saveMaint() {
+function saveMaint() {
   if (!eqId) return;
   const date=document.getElementById('m-date').value,
         desc=document.getElementById('m-desc').value.trim();
   if (!date||!desc) { toast('날짜와 정비 내역을 입력해주세요.',true); return; }
-  try {
-    await api('POST',`/api/equipment/${eqId}/maintenance`,{
-      date, description:desc,
-      cost: document.getElementById('m-cost').value||0,
-      mechanic: document.getElementById('m-mech').value.trim(),
-      notes: document.getElementById('m-note').value.trim()
-    });
-    toast('저장되었습니다.');
-    ['m-desc','m-cost','m-mech','m-note'].forEach(id=>document.getElementById(id).value='');
-    loadMaint();
-  } catch(e) { toast(e.message,true); }
+  const cost = parseInt(document.getElementById('m-cost').value)||0;
+  const mechanic = document.getElementById('m-mech').value.trim();
+  const notes = document.getElementById('m-note').value.trim();
+  addMaintenanceRecord(eqId, date, desc, cost, mechanic, notes);
+  toast('정비 내역이 저장되었습니다.');
+  ['m-desc','m-cost','m-mech','m-note'].forEach(id=>document.getElementById(id).value='');
+  loadMaint();
 }
 
-async function delMaint(id) {
+function delMaint(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE',`/api/equipment/${eqId}/maintenance/${id}`);
+  deleteMaintenanceRecord(eqId, id);
   toast('삭제되었습니다.'); loadMaint();
 }
 
@@ -651,11 +852,12 @@ function calcFuel() {
   if (a&&p) document.getElementById('fu-total').value=Math.round(a*p);
 }
 
-async function loadFuel() {
+function loadFuel() {
   if (!eqId) return;
-  const data = await api('GET',`/api/equipment/${eqId}/fuel`);
+  const data = getFuelData(eqId);
   document.getElementById('fuel-amt').textContent  = fmt(data.total_amount);
   document.getElementById('fuel-cost').textContent = fmt(data.total_cost);
+  document.getElementById('fuel-eff').textContent  = data.avg_efficiency!=null ? fmt(data.avg_efficiency) : '-';
   const el = document.getElementById('fuel-list');
   el.innerHTML = data.records.length
     ? data.records.map(r=>`
@@ -670,29 +872,74 @@ async function loadFuel() {
     : '<div class="empty-msg">주유 내역이 없습니다.</div>';
 }
 
-async function saveFuel() {
+function saveFuel() {
   if (!eqId) return;
   const date=document.getElementById('fu-date').value,
-        amount=document.getElementById('fu-amt').value;
-  if (!date||!amount) { toast('날짜와 주유량을 입력해주세요.',true); return; }
-  try {
-    await api('POST',`/api/equipment/${eqId}/fuel`,{
-      date, amount,
-      unit_price: document.getElementById('fu-price').value||0,
-      total_cost: document.getElementById('fu-total').value||0,
-      station:    document.getElementById('fu-station').value.trim(),
-      notes:      document.getElementById('fu-note').value.trim()
-    });
-    toast('저장되었습니다.');
-    ['fu-amt','fu-price','fu-total','fu-station','fu-note'].forEach(id=>document.getElementById(id).value='');
-    loadFuel();
-  } catch(e) { toast(e.message,true); }
+        amountRaw=document.getElementById('fu-amt').value;
+  if (!date||!amountRaw) { toast('날짜와 주유량을 입력해주세요.',true); return; }
+  const amount = parseFloat(amountRaw)||0;
+  const unit_price = parseInt(document.getElementById('fu-price').value)||0;
+  const total_cost = parseInt(document.getElementById('fu-total').value) || Math.round(amount*unit_price);
+  const station = document.getElementById('fu-station').value.trim();
+  const notes = document.getElementById('fu-note').value.trim();
+  addFuelRecord(eqId, date, amount, unit_price, total_cost, station, notes);
+  toast('주유 내역이 저장되었습니다.');
+  ['fu-amt','fu-price','fu-total','fu-station','fu-note'].forEach(id=>document.getElementById(id).value='');
+  loadFuel();
 }
 
-async function delFuel(id) {
+function delFuel(id) {
   if (!confirm('삭제하시겠습니까?')) return;
-  await api('DELETE',`/api/equipment/${eqId}/fuel/${id}`);
+  deleteFuelRecord(eqId, id);
   toast('삭제되었습니다.'); loadFuel();
+}
+
+// ── Backup / Restore ─────────────────────────────────────────────────────────
+function exportBackup() {
+  const blob = new Blob([JSON.stringify(DB, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `중장비관리_backup_${today()}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast('백업 파일을 내보냈습니다.');
+}
+
+function importBackup(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const parsed = JSON.parse(reader.result);
+      if (!parsed || !Array.isArray(parsed.equipment)) throw new Error('invalid backup file');
+      if (!confirm('현재 데이터를 백업 파일 내용으로 덮어씁니다. 계속하시겠습니까?')) return;
+      DB = {
+        equipment:   Array.isArray(parsed.equipment)   ? parsed.equipment   : [],
+        operations:  Array.isArray(parsed.operations)  ? parsed.operations  : [],
+        maintenance: Array.isArray(parsed.maintenance) ? parsed.maintenance : [],
+        fuel:        Array.isArray(parsed.fuel)        ? parsed.fuel        : []
+      };
+      saveDB();
+      eqId = null;
+      document.getElementById('hdr-icon').textContent='⚙';
+      document.getElementById('hdr-name').textContent='중장비 관리';
+      document.getElementById('hdr-meta').textContent='장비를 선택하세요';
+      ['home','ops','maint','fuel'].forEach(v => {
+        document.getElementById('no-eq-'+v).style.display='';
+        document.getElementById(v+'-body').style.display='none';
+      });
+      loadEqList();
+      toast('백업 파일을 가져왔습니다.');
+    } catch(e) {
+      toast('올바른 백업 파일이 아닙니다.', true);
+    }
+  };
+  reader.readAsText(file);
+  evt.target.value = '';
 }
 
 // ── Sheet ─────────────────────────────────────────────────────────────────────
