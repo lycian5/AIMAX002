@@ -1,5 +1,10 @@
-const CACHE = 'heavy-eq-v2';
-const PRECACHE = ['/', '/manifest.json', '/static/icon.svg'];
+const CACHE = 'forklift-log-v1';
+const PRECACHE = [
+  '/',
+  '/manifest.json',
+  '/static/icon.svg',
+  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js'
+];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));

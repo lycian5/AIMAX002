@@ -1,11 +1,11 @@
 {
-  "name": "중장비 관리 시스템",
-  "short_name": "중장비",
-  "description": "중장비 가동, 정비, 주유 관리",
+  "name": "지게차 관리",
+  "short_name": "지게차관리",
+  "description": "지게차 사용시간, 주행거리, 정비, 주유 관리",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0f1117",
-  "theme_color": "#f59e0b",
+  "background_color": "#f1f5f9",
+  "theme_color": "#4f46e5",
   "orientation": "portrait-primary",
   "icons": [
     {
