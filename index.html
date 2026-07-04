@@ -120,6 +120,12 @@
     .quick-check-row { display:flex; align-items:center; gap:10px; background:#f8fafc; padding:12px 14px; border-radius:10px; margin-bottom:16px; font-size:0.9rem; font-weight:600; cursor:pointer; }
     .quick-check-row input[type="checkbox"] { width:20px; height:20px; accent-color:var(--fuel); flex-shrink:0; }
 
+    .btn-upload { width:100%; padding:14px; border:2px dashed var(--border); border-radius:12px; background:var(--bg); color:var(--sub); font-size:0.95rem; font-weight:600; cursor:pointer; }
+    .btn-upload:active { border-color:var(--primary); color:var(--primary); }
+    .photo-preview { position:relative; margin-top:10px; }
+    .photo-preview img { width:100%; max-height:280px; object-fit:cover; border-radius:12px; display:block; }
+    .photo-remove-btn { position:absolute; top:8px; right:8px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer; }
+
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
     .modal-overlay.hidden { display:none; }
     .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
@@ -145,6 +151,7 @@
 <div class="tab-bar">
   <button class="tab active" data-tab="summary"><span class="tab-icon">📊</span>요약</button>
   <button class="tab" data-tab="usage"><span class="tab-icon">⏱️</span>사용</button>
+  <button class="tab" data-tab="work"><span class="tab-icon">📝</span>작업</button>
   <button class="tab" data-tab="fuel"><span class="tab-icon">⛽</span>주유</button>
   <button class="tab" data-tab="maint"><span class="tab-icon">🔧</span>정비</button>
   <button class="tab" data-tab="trend"><span class="tab-icon">📈</span>추이</button>
@@ -261,6 +268,35 @@
       </div>
 
       <button class="btn btn-primary" id="btn-save-usage">💾 저장하기</button>
+    </div>
+  </div>
+
+  <!-- 작업 탭 -->
+  <div class="tab-panel" id="tab-work">
+    <div class="card">
+      <div class="card-title">📝 작업시간 기록 입력</div>
+
+      <div class="form-group">
+        <label class="form-label">작업시간 (h) *</label>
+        <input class="form-input" id="inp-work-hours" type="number" step="0.1" min="0" placeholder="예) 8.0">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">작업확인서 사진 (선택, 증빙용)</label>
+        <input type="file" accept="image/*" id="inp-work-photo" style="display:none">
+        <button class="btn-upload" id="btn-work-photo-pick">📷 사진 촬영/첨부</button>
+        <div class="photo-preview" id="work-photo-preview" style="display:none">
+          <img id="work-photo-img" alt="작업확인서 사진">
+          <button class="photo-remove-btn" id="btn-work-photo-remove">✕</button>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">메모 (선택)</label>
+        <input class="form-input" id="inp-work-memo" placeholder="작업 내용 등">
+      </div>
+
+      <button class="btn btn-success" id="btn-save-work">💾 작업시간 기록 저장</button>
     </div>
   </div>
 
@@ -382,12 +418,13 @@
         return {
           equipmentName: typeof p.equipmentName === 'string' ? p.equipmentName : '',
           dailyLogs: Array.isArray(p.dailyLogs) ? p.dailyLogs : [],
+          workLogs:  Array.isArray(p.workLogs)  ? p.workLogs  : [],
           fuelLogs:  Array.isArray(p.fuelLogs)  ? p.fuelLogs  : [],
           maintLogs: Array.isArray(p.maintLogs) ? p.maintLogs : []
         };
       }
     } catch (e) {}
-    return { equipmentName: '', dailyLogs: [], fuelLogs: [], maintLogs: [] };
+    return { equipmentName: '', dailyLogs: [], workLogs: [], fuelLogs: [], maintLogs: [] };
   }
   function saveDB() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
   function newId() { return Date.now() * 1000 + Math.floor(Math.random() * 1000); }
@@ -456,6 +493,7 @@
     const active = document.querySelector('.tab.active').dataset.tab;
     if (active === 'summary') loadSummary();
     if (active === 'usage')   loadUsageTab();
+    if (active === 'work')    loadWorkTab();
     if (active === 'fuel')    loadFuelTab();
     if (active === 'trend')   renderCharts();
   }
@@ -561,6 +599,89 @@
     saveDB();
     showToast('✅ 사용 기록이 저장되었습니다');
     loadUsageTab();
+  });
+
+  // ── 작업 (작업확인서 기준 작업시간 + 사진 증빙) ─────────────────────────────────
+  let currentWorkPhoto = null;
+
+  function compressImage(file, maxDim, quality) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          let { width, height } = img;
+          if (width > maxDim || height > maxDim) {
+            if (width > height) { height = Math.round(height * maxDim / width); width = maxDim; }
+            else { width = Math.round(width * maxDim / height); height = maxDim; }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+          resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = () => reject(new Error('image load failed'));
+        img.src = reader.result;
+      };
+      reader.onerror = () => reject(new Error('file read failed'));
+      reader.readAsDataURL(file);
+    });
+  }
+
+  function showWorkPhotoPreview(dataUrl) {
+    const preview = document.getElementById('work-photo-preview');
+    if (dataUrl) {
+      document.getElementById('work-photo-img').src = dataUrl;
+      preview.style.display = 'block';
+    } else {
+      preview.style.display = 'none';
+    }
+  }
+
+  document.getElementById('btn-work-photo-pick').addEventListener('click', () => document.getElementById('inp-work-photo').click());
+  document.getElementById('inp-work-photo').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      currentWorkPhoto = await compressImage(file, 1280, 0.7);
+      showWorkPhotoPreview(currentWorkPhoto);
+    } catch (err) {
+      showToast('⚠️ 사진을 불러오지 못했습니다');
+    }
+  });
+  document.getElementById('btn-work-photo-remove').addEventListener('click', () => {
+    currentWorkPhoto = null;
+    showWorkPhotoPreview(null);
+  });
+
+  function loadWorkTab() {
+    const date = selectedDate();
+    const rec = DB.workLogs.find(w => w.date === date);
+    document.getElementById('inp-work-hours').value = rec ? rec.hours : '';
+    document.getElementById('inp-work-memo').value  = rec ? (rec.memo || '') : '';
+    currentWorkPhoto = rec ? (rec.photo || null) : null;
+    showWorkPhotoPreview(currentWorkPhoto);
+  }
+
+  document.getElementById('btn-save-work').addEventListener('click', () => {
+    const date = selectedDate();
+    const hours = parseFloat(document.getElementById('inp-work-hours').value);
+    if (isNaN(hours) || hours < 0) { showToast('⚠️ 작업시간을 입력해주세요'); return; }
+    const memo = document.getElementById('inp-work-memo').value.trim();
+    const idx = DB.workLogs.findIndex(w => w.date === date);
+    const rec = {
+      id: idx >= 0 ? DB.workLogs[idx].id : newId(),
+      date, hours, photo: currentWorkPhoto, memo,
+      created_at: idx >= 0 ? DB.workLogs[idx].created_at : new Date().toISOString()
+    };
+    try {
+      if (idx >= 0) DB.workLogs[idx] = rec; else DB.workLogs.push(rec);
+      saveDB();
+      showToast('✅ 작업시간 기록이 저장되었습니다');
+    } catch (err) {
+      showToast('⚠️ 저장 공간이 부족합니다. 사진 없이 다시 시도해보세요');
+    }
   });
 
   // ── 주유 (체크만 기록, 요약/주유 탭 공용) ────────────────────────────────────────
@@ -713,6 +834,7 @@
         DB = {
           equipmentName: typeof parsed.equipmentName === 'string' ? parsed.equipmentName : '',
           dailyLogs: Array.isArray(parsed.dailyLogs) ? parsed.dailyLogs : [],
+          workLogs:  Array.isArray(parsed.workLogs)  ? parsed.workLogs  : [],
           fuelLogs:  Array.isArray(parsed.fuelLogs)  ? parsed.fuelLogs  : [],
           maintLogs: Array.isArray(parsed.maintLogs) ? parsed.maintLogs : []
         };
