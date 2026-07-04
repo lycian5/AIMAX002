@@ -126,6 +126,11 @@
     .photo-preview img { width:100%; max-height:280px; object-fit:cover; border-radius:12px; display:block; }
     .photo-remove-btn { position:absolute; top:8px; right:8px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:28px; height:28px; font-size:14px; cursor:pointer; }
 
+    .photo-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:8px; margin-top:10px; }
+    .photo-thumb { position:relative; aspect-ratio:1/1; border-radius:10px; overflow:hidden; }
+    .photo-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+    .photo-thumb button { position:absolute; top:4px; right:4px; background:rgba(0,0,0,.6); color:#fff; border:none; border-radius:50%; width:22px; height:22px; font-size:12px; line-height:1; cursor:pointer; }
+
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
     .modal-overlay.hidden { display:none; }
     .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
@@ -266,6 +271,16 @@
       </div>
 
       <div class="form-group">
+        <label class="form-label">계기판 사진 (선택, 증빙용)</label>
+        <input type="file" accept="image/*" id="inp-usage-photo" style="display:none">
+        <button class="btn-upload" id="btn-usage-photo-pick">📷 계기판 사진 촬영/첨부</button>
+        <div class="photo-preview" id="usage-photo-preview" style="display:none">
+          <img id="usage-photo-img" alt="계기판 사진">
+          <button class="photo-remove-btn" id="btn-usage-photo-remove">✕</button>
+        </div>
+      </div>
+
+      <div class="form-group">
         <label class="form-label">메모 (선택)</label>
         <textarea class="form-textarea" id="inp-memo" placeholder="특이사항을 입력하세요"></textarea>
       </div>
@@ -285,13 +300,10 @@
       </div>
 
       <div class="form-group">
-        <label class="form-label">작업확인서 사진 (선택, 증빙용)</label>
-        <input type="file" accept="image/*" id="inp-work-photo" style="display:none">
+        <label class="form-label">작업확인서 사진 (선택, 증빙용 · 여러 장 가능)</label>
+        <input type="file" accept="image/*" id="inp-work-photo" multiple style="display:none">
         <button class="btn-upload" id="btn-work-photo-pick">📷 사진 촬영/첨부</button>
-        <div class="photo-preview" id="work-photo-preview" style="display:none">
-          <img id="work-photo-img" alt="작업확인서 사진">
-          <button class="photo-remove-btn" id="btn-work-photo-remove">✕</button>
-        </div>
+        <div class="photo-grid" id="work-photo-grid"></div>
       </div>
 
       <div class="form-group">
@@ -591,6 +603,8 @@
     document.getElementById('inp-hm').value   = existing ? existing.hourMeter : '';
     document.getElementById('inp-odo').value  = existing ? existing.odometer  : '';
     document.getElementById('inp-memo').value = existing ? (existing.memo || '') : '';
+    currentUsagePhoto = existing ? (existing.photo || null) : null;
+    showPhotoPreview('usage-photo-preview', 'usage-photo-img', currentUsagePhoto);
     updateUsagePreview();
   }
   function updateUsagePreview() {
@@ -611,6 +625,24 @@
   }
   ['inp-hm','inp-odo'].forEach(id => document.getElementById(id).addEventListener('input', updateUsagePreview));
 
+  let currentUsagePhoto = null;
+  document.getElementById('btn-usage-photo-pick').addEventListener('click', () => document.getElementById('inp-usage-photo').click());
+  document.getElementById('inp-usage-photo').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      currentUsagePhoto = await compressImage(file, 1280, 0.7);
+      showPhotoPreview('usage-photo-preview', 'usage-photo-img', currentUsagePhoto);
+    } catch (err) {
+      showToast('⚠️ 사진을 불러오지 못했습니다');
+    }
+  });
+  document.getElementById('btn-usage-photo-remove').addEventListener('click', () => {
+    currentUsagePhoto = null;
+    showPhotoPreview('usage-photo-preview', 'usage-photo-img', null);
+  });
+
   document.getElementById('btn-save-usage').addEventListener('click', () => {
     const date = selectedDate();
     const hm  = parseFloat(document.getElementById('inp-hm').value);
@@ -618,15 +650,24 @@
     if (isNaN(hm) || isNaN(odo)) { showToast('⚠️ 시간계와 거리계를 입력해주세요'); return; }
     const memo = document.getElementById('inp-memo').value.trim();
     const idx = DB.dailyLogs.findIndex(d => d.date === date);
-    if (idx >= 0) DB.dailyLogs[idx] = { ...DB.dailyLogs[idx], hourMeter: hm, odometer: odo, memo };
-    else DB.dailyLogs.push({ id: newId(), date, hourMeter: hm, odometer: odo, memo, created_at: new Date().toISOString() });
-    saveDB();
-    showToast('✅ 사용 기록이 저장되었습니다');
+    const rec = {
+      id: idx >= 0 ? DB.dailyLogs[idx].id : newId(),
+      date, hourMeter: hm, odometer: odo, memo, photo: currentUsagePhoto,
+      created_at: idx >= 0 ? DB.dailyLogs[idx].created_at : new Date().toISOString()
+    };
+    try {
+      if (idx >= 0) DB.dailyLogs[idx] = rec; else DB.dailyLogs.push(rec);
+      saveDB();
+      showToast('✅ 사용 기록이 저장되었습니다');
+    } catch (err) {
+      showToast('⚠️ 저장 공간이 부족합니다. 사진 없이 다시 시도해보세요');
+    }
     loadUsageTab();
   });
 
-  // ── 작업 (작업확인서 기준 작업시간 + 사진 증빙) ─────────────────────────────────
-  let currentWorkPhoto = null;
+  // ── 작업 (작업확인서 기준 작업시간 + 사진 증빙, 여러 장 첨부 가능) ────────────────
+  let currentWorkPhotos = [];
+  const MAX_WORK_PHOTOS = 6;
 
   function compressImage(file, maxDim, quality) {
     return new Promise((resolve, reject) => {
@@ -652,31 +693,44 @@
     });
   }
 
-  function showWorkPhotoPreview(dataUrl) {
-    const preview = document.getElementById('work-photo-preview');
+  function showPhotoPreview(previewId, imgId, dataUrl) {
+    const preview = document.getElementById(previewId);
     if (dataUrl) {
-      document.getElementById('work-photo-img').src = dataUrl;
+      document.getElementById(imgId).src = dataUrl;
       preview.style.display = 'block';
     } else {
       preview.style.display = 'none';
     }
   }
 
+  function renderWorkPhotoGrid() {
+    document.getElementById('work-photo-grid').innerHTML = currentWorkPhotos.map((src, i) => `
+      <div class="photo-thumb">
+        <img src="${src}" alt="작업확인서 사진 ${i+1}">
+        <button onclick="removeWorkPhoto(${i})">✕</button>
+      </div>`).join('');
+  }
+  function removeWorkPhoto(index) {
+    currentWorkPhotos.splice(index, 1);
+    renderWorkPhotoGrid();
+  }
+
   document.getElementById('btn-work-photo-pick').addEventListener('click', () => document.getElementById('inp-work-photo').click());
   document.getElementById('inp-work-photo').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = '';
-    if (!file) return;
-    try {
-      currentWorkPhoto = await compressImage(file, 1280, 0.7);
-      showWorkPhotoPreview(currentWorkPhoto);
-    } catch (err) {
-      showToast('⚠️ 사진을 불러오지 못했습니다');
+    if (!files.length) return;
+    const room = MAX_WORK_PHOTOS - currentWorkPhotos.length;
+    if (room <= 0) { showToast(`⚠️ 사진은 최대 ${MAX_WORK_PHOTOS}장까지 첨부할 수 있습니다`); return; }
+    if (files.length > room) showToast(`⚠️ 사진은 최대 ${MAX_WORK_PHOTOS}장까지만 추가됩니다`);
+    for (const file of files.slice(0, room)) {
+      try {
+        currentWorkPhotos.push(await compressImage(file, 1280, 0.7));
+      } catch (err) {
+        showToast('⚠️ 사진을 불러오지 못했습니다');
+      }
     }
-  });
-  document.getElementById('btn-work-photo-remove').addEventListener('click', () => {
-    currentWorkPhoto = null;
-    showWorkPhotoPreview(null);
+    renderWorkPhotoGrid();
   });
 
   function loadWorkTab() {
@@ -684,8 +738,8 @@
     const rec = DB.workLogs.find(w => w.date === date);
     document.getElementById('inp-work-hours').value = rec ? rec.hours : '';
     document.getElementById('inp-work-memo').value  = rec ? (rec.memo || '') : '';
-    currentWorkPhoto = rec ? (rec.photo || null) : null;
-    showWorkPhotoPreview(currentWorkPhoto);
+    currentWorkPhotos = rec ? (rec.photos || (rec.photo ? [rec.photo] : [])) : [];
+    renderWorkPhotoGrid();
   }
 
   document.getElementById('btn-save-work').addEventListener('click', () => {
@@ -696,7 +750,7 @@
     const idx = DB.workLogs.findIndex(w => w.date === date);
     const rec = {
       id: idx >= 0 ? DB.workLogs[idx].id : newId(),
-      date, hours, photo: currentWorkPhoto, memo,
+      date, hours, photos: currentWorkPhotos.slice(), memo,
       created_at: idx >= 0 ? DB.workLogs[idx].created_at : new Date().toISOString()
     };
     try {
@@ -704,7 +758,7 @@
       saveDB();
       showToast('✅ 작업시간 기록이 저장되었습니다');
     } catch (err) {
-      showToast('⚠️ 저장 공간이 부족합니다. 사진 없이 다시 시도해보세요');
+      showToast('⚠️ 저장 공간이 부족합니다. 사진 수를 줄여 다시 시도해보세요');
     }
   });
 
