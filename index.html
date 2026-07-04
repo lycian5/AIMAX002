@@ -115,6 +115,9 @@
     .empty { text-align:center; padding:30px; color:var(--sub); font-size:0.9rem; }
     .empty-icon { font-size:2.5rem; margin-bottom:8px; }
 
+    .quick-check-row { display:flex; align-items:center; gap:10px; background:#f8fafc; padding:12px 14px; border-radius:10px; margin-bottom:16px; font-size:0.9rem; font-weight:600; cursor:pointer; }
+    .quick-check-row input[type="checkbox"] { width:20px; height:20px; accent-color:var(--fuel); flex-shrink:0; }
+
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
     .modal-overlay.hidden { display:none; }
     .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
@@ -125,7 +128,7 @@
 
 <div class="app-header">
   <div class="header-row">
-    <div class="app-title">🚜 지게차 관리</div>
+    <div class="app-title" id="app-title">🚜 지게차 관리</div>
     <div class="header-actions">
       <div class="date-pill">
         <span>📅</span>
@@ -250,6 +253,10 @@
   <div class="tab-panel" id="tab-fuel">
     <div class="card">
       <div class="card-title">⛽ 주유 기록 입력</div>
+      <label class="quick-check-row" for="chk-fuel-quick">
+        <input type="checkbox" id="chk-fuel-quick">
+        <span>상세 입력 없이 "주유함"만 체크하기</span>
+      </label>
       <div class="input-row">
         <div class="form-group">
           <label class="form-label">주유량 (L)</label>
@@ -331,7 +338,12 @@
 <!-- 설정(백업/복원) 모달 -->
 <div id="settings-modal" class="modal-overlay hidden">
   <div class="modal-card">
-    <div class="card-title" style="margin-bottom:0">⚙️ 데이터 관리</div>
+    <div class="card-title" style="margin-bottom:0">⚙️ 장비 / 데이터 관리</div>
+    <div class="form-group" style="margin-bottom:6px;">
+      <label class="form-label">장비 이름</label>
+      <input class="form-input" id="inp-equipment-name" placeholder="예: 1호기 지게차">
+    </div>
+    <button class="btn btn-success" onclick="saveEquipmentName()">이름 저장</button>
     <p class="modal-hint">모든 기록은 이 기기의 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 기록이 사라지니 주기적으로 백업해두세요.</p>
     <button class="btn btn-primary" onclick="exportBackup()">⬇ 백업 내보내기</button>
     <button class="btn btn-fuel" onclick="document.getElementById('import-file').click()">⬆ 백업 가져오기</button>
@@ -353,13 +365,14 @@
       if (raw) {
         const p = JSON.parse(raw);
         return {
+          equipmentName: typeof p.equipmentName === 'string' ? p.equipmentName : '',
           dailyLogs: Array.isArray(p.dailyLogs) ? p.dailyLogs : [],
           fuelLogs:  Array.isArray(p.fuelLogs)  ? p.fuelLogs  : [],
           maintLogs: Array.isArray(p.maintLogs) ? p.maintLogs : []
         };
       }
     } catch (e) {}
-    return { dailyLogs: [], fuelLogs: [], maintLogs: [] };
+    return { equipmentName: '', dailyLogs: [], fuelLogs: [], maintLogs: [] };
   }
   function saveDB() { localStorage.setItem(STORAGE_KEY, JSON.stringify(DB)); }
   function newId() { return Date.now() * 1000 + Math.floor(Math.random() * 1000); }
@@ -428,6 +441,7 @@
     const active = document.querySelector('.tab.active').dataset.tab;
     if (active === 'summary') loadSummary();
     if (active === 'usage')   loadUsageTab();
+    if (active === 'fuel')    loadFuelTab();
     if (active === 'trend')   renderCharts();
   }
 
@@ -446,7 +460,10 @@
     const fuelTotalL   = fuels.reduce((s,f) => s + f.liters, 0);
     const fuelTotalAmt = fuels.reduce((s,f) => s + f.amount, 0);
     document.getElementById('kpi-fuel').textContent = fuelTotalL.toFixed(1);
-    document.getElementById('kpi-fuel-amt').textContent = fuels.length ? `💰 ${fmt(fuelTotalAmt)}원` : '기록 없음';
+    const hasQuickOnly = fuels.length > 0 && fuels.every(f => f.quick);
+    document.getElementById('kpi-fuel-amt').textContent = fuels.length === 0
+      ? '기록 없음'
+      : (hasQuickOnly ? '✔ 주유함 (상세 없음)' : `💰 ${fmt(fuelTotalAmt)}원`);
 
     const maints = DB.maintLogs.filter(m => m.date === date);
     document.getElementById('kpi-maint').textContent = maints.length;
@@ -475,11 +492,12 @@
         <div class="record-item">
           <div class="record-left">
             <span class="badge badge-fuel">주유</span>
-            <span style="font-size:0.8rem;color:var(--sub)">${f.memo||''}</span>
+            <span style="font-size:0.8rem;color:var(--sub)">${f.quick ? '체크만 기록 (상세 없음)' : (f.memo||'')}</span>
           </div>
           <div class="record-right">
-            <div class="record-val">${fmt(f.liters)} L</div>
-            <div class="record-cost">${fmt(f.unitPrice)}원/L</div>
+            ${f.quick
+              ? '<div class="record-val">✔ 완료</div>'
+              : `<div class="record-val">${fmt(f.liters)} L</div><div class="record-cost">${fmt(f.unitPrice)}원/L</div>`}
           </div>
         </div>`).join('')
       : '<div class="empty"><div class="empty-icon">⛽</div>주유 기록이 없습니다.</div>';
@@ -530,6 +548,33 @@
   });
 
   // ── 주유 ──────────────────────────────────────────────────────────────────────
+  function loadFuelTab() {
+    const date = selectedDate();
+    const quickRec = DB.fuelLogs.find(f => f.date === date && f.quick);
+    document.getElementById('chk-fuel-quick').checked = !!quickRec;
+    setFuelFormDisabled(!!quickRec);
+  }
+  function setFuelFormDisabled(disabled) {
+    ['inp-liters','inp-unit-price','inp-fuel-memo','btn-save-fuel'].forEach(id => {
+      document.getElementById(id).disabled = disabled;
+    });
+    document.getElementById('btn-save-fuel').style.opacity = disabled ? '0.5' : '1';
+  }
+  document.getElementById('chk-fuel-quick').addEventListener('change', (e) => {
+    const date = selectedDate();
+    DB.fuelLogs = DB.fuelLogs.filter(f => !(f.date === date && f.quick));
+    if (e.target.checked) {
+      DB.fuelLogs.push({ id: newId(), date, liters: 0, unitPrice: 0, amount: 0, memo: '', quick: true, created_at: new Date().toISOString() });
+      saveDB();
+      setFuelFormDisabled(true);
+      showToast('⛽ 주유함으로 체크되었습니다');
+    } else {
+      saveDB();
+      setFuelFormDisabled(false);
+      showToast('체크가 해제되었습니다');
+    }
+  });
+
   ['inp-liters','inp-unit-price'].forEach(id => document.getElementById(id).addEventListener('input', updateFuelPreview));
   function updateFuelPreview() {
     const l  = parseFloat(document.getElementById('inp-liters').value);
@@ -606,8 +651,24 @@
     });
   }
 
+  // ── 장비 이름 ─────────────────────────────────────────────────────────────────
+  function updateAppTitle() {
+    const title = DB.equipmentName ? `🚜 ${DB.equipmentName}` : '🚜 지게차 관리';
+    document.getElementById('app-title').textContent = title;
+    document.title = title;
+  }
+  function saveEquipmentName() {
+    DB.equipmentName = document.getElementById('inp-equipment-name').value.trim();
+    saveDB();
+    updateAppTitle();
+    showToast('✅ 장비 이름이 저장되었습니다');
+  }
+
   // ── 설정 / 백업 · 복원 ─────────────────────────────────────────────────────────
-  function openSettings()  { document.getElementById('settings-modal').classList.remove('hidden'); }
+  function openSettings()  {
+    document.getElementById('inp-equipment-name').value = DB.equipmentName || '';
+    document.getElementById('settings-modal').classList.remove('hidden');
+  }
   function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
 
   function exportBackup() {
@@ -633,11 +694,13 @@
         if (!Array.isArray(parsed.dailyLogs)) throw new Error('invalid backup file');
         if (!confirm('현재 데이터를 백업 파일 내용으로 덮어씁니다. 계속하시겠습니까?')) return;
         DB = {
+          equipmentName: typeof parsed.equipmentName === 'string' ? parsed.equipmentName : '',
           dailyLogs: Array.isArray(parsed.dailyLogs) ? parsed.dailyLogs : [],
           fuelLogs:  Array.isArray(parsed.fuelLogs)  ? parsed.fuelLogs  : [],
           maintLogs: Array.isArray(parsed.maintLogs) ? parsed.maintLogs : []
         };
         saveDB();
+        updateAppTitle();
         closeSettings();
         refreshActiveTab();
         showToast('⬆ 백업을 복원했습니다');
@@ -664,6 +727,7 @@
   // ── Init ──────────────────────────────────────────────────────────────────────
   document.getElementById('dateSelect').value = new Date().toISOString().slice(0,10);
   updateDayBadge();
+  updateAppTitle();
   loadSummary();
 </script>
 </body>
