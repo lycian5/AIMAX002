@@ -6,17 +6,16 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="지게차관리">
-  <meta name="theme-color" content="#4f46e5">
-  <title>🚜 지게차 관리</title>
+  <meta name="apple-mobile-web-app-title" content="빌드노트">
+  <meta name="theme-color" content="#0f766e">
+  <title>빌드노트 | 모바일 장비 관리</title>
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" href="/static/icons/icon-192.png">
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
   <style>
     :root {
-      --primary: #4f46e5;
-      --primary-light: #818cf8;
+      --primary: #0f766e;
+      --primary-light: #5eead4;
       --success: #10b981;
       --warning: #f59e0b;
       --danger:  #ef4444;
@@ -31,16 +30,24 @@
     * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
     body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background:var(--bg); color:var(--text); min-height:100vh; padding-bottom:40px; }
 
-    .app-header { background:linear-gradient(135deg,var(--primary),#7c3aed); color:#fff; padding:20px 20px 30px; position:sticky; top:0; z-index:100; }
+    .app-header { background:linear-gradient(135deg,var(--primary),#155e75); color:#fff; padding:16px 16px 18px; position:sticky; top:0; z-index:100; }
     .header-row { display:flex; justify-content:space-between; align-items:center; gap:10px; }
     .app-title { font-size:1.4rem; font-weight:700; }
     .header-actions { display:flex; gap:8px; align-items:center; }
     .date-pill { background:rgba(255,255,255,0.2); border-radius:30px; padding:6px 14px; display:flex; align-items:center; gap:8px; }
     .date-pill input[type="date"] { background:none; border:none; color:#fff; font-size:0.95rem; font-weight:600; outline:none; width:130px; color-scheme:dark; }
     .icon-btn { background:rgba(255,255,255,0.2); border:none; color:#fff; width:36px; height:36px; border-radius:50%; font-size:1.05rem; cursor:pointer; flex-shrink:0; }
-    .day-badge { background:rgba(255,255,255,0.3); border-radius:20px; padding:3px 10px; font-size:0.8rem; font-weight:700; margin-top:10px; display:inline-block; }
+    .install-icon-ready { position:relative; background:rgba(94,234,212,.3); }
+    .install-icon-ready::after { content:''; position:absolute; top:1px; right:1px; width:9px; height:9px; border-radius:50%; background:#fbbf24; border:2px solid #0f766e; }
+    .header-subrow { display:flex; align-items:center; gap:8px; margin-top:10px; }
+    .equipment-select { flex:1; min-width:0; background:rgba(255,255,255,.18); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:12px; padding:9px 34px 9px 12px; font-size:.9rem; font-weight:700; outline:none; }
+    .equipment-select option { color:var(--text); background:#fff; }
+    .day-badge { background:rgba(255,255,255,0.3); border-radius:20px; padding:5px 10px; font-size:0.78rem; font-weight:700; display:inline-block; white-space:nowrap; }
 
-    .tab-bar { display:flex; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:90px; z-index:99; overflow-x:auto; }
+    .mode-switch-bar { display:flex; gap:4px; padding:7px 16px; background:#e2e8f0; position:sticky; top:118px; z-index:99; }
+    .mode-button { flex:1; border:none; border-radius:10px; padding:10px 12px; color:var(--sub); background:transparent; font-size:.86rem; font-weight:800; cursor:pointer; }
+    .mode-button.active { background:#fff; color:var(--primary); box-shadow:0 2px 8px rgba(15,23,42,.1); }
+    .tab-bar { display:flex; background:var(--card); border-bottom:1px solid var(--border); position:sticky; top:169px; z-index:98; overflow-x:auto; }
     .tab-bar::-webkit-scrollbar { display:none; }
     .tab { flex:1; min-width:80px; padding:14px 8px; text-align:center; font-size:0.8rem; font-weight:600; color:var(--sub); border:none; background:none; cursor:pointer; border-bottom:3px solid transparent; transition:all .2s; }
     .tab.active { color:var(--primary); border-bottom-color:var(--primary); }
@@ -58,6 +65,7 @@
     .kpi::before { content:''; position:absolute; top:0; left:0; width:100%; height:4px; }
     .kpi.hours::before  { background:linear-gradient(90deg,var(--primary),var(--primary-light)); }
     .kpi.km::before     { background:linear-gradient(90deg,var(--success),#34d399); }
+    .kpi.work::before   { background:linear-gradient(90deg,#8b5cf6,#c4b5fd); }
     .kpi.fuel::before   { background:linear-gradient(90deg,var(--fuel),#60a5fa); }
     .kpi.maint::before  { background:linear-gradient(90deg,var(--warning),#fcd34d); }
     .kpi-label { font-size:0.75rem; color:var(--sub); font-weight:600; margin-bottom:6px; }
@@ -77,12 +85,13 @@
     .hint { font-size:0.78rem; color:var(--sub); margin-top:4px; }
 
     .btn { width:100%; padding:16px; border:none; border-radius:14px; font-size:1rem; font-weight:700; cursor:pointer; transition:all .2s; display:flex; align-items:center; justify-content:center; gap:8px; }
-    .btn-primary { background:linear-gradient(135deg,var(--primary),#7c3aed); color:#fff; }
+    .btn-primary { background:linear-gradient(135deg,var(--primary),#155e75); color:#fff; }
     .btn-success { background:linear-gradient(135deg,var(--success),#059669); color:#fff; }
     .btn-fuel    { background:linear-gradient(135deg,var(--fuel),#2563eb); color:#fff; }
     .btn-warning { background:linear-gradient(135deg,var(--warning),#d97706); color:#fff; }
     .btn-plain   { background:none; color:var(--sub); box-shadow:none; }
     .btn:active  { transform:scale(0.97); opacity:.9; }
+    .btn:disabled { opacity:.58; cursor:not-allowed; transform:none; }
 
     .calc-preview { background:linear-gradient(135deg,#ede9fe,#ddd6fe); border-radius:12px; padding:16px; margin:16px 0; display:none; }
     .calc-preview.show { display:block; }
@@ -133,27 +142,151 @@
 
     .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:200; display:flex; align-items:center; justify-content:center; padding:20px; }
     .modal-overlay.hidden { display:none; }
-    .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:360px; display:flex; flex-direction:column; gap:10px; }
+    .hidden { display:none !important; }
+    .modal-card { background:#fff; border-radius:var(--radius); padding:24px; width:100%; max-width:420px; max-height:90vh; overflow-y:auto; display:flex; flex-direction:column; gap:10px; }
     .modal-hint { font-size:0.78rem; color:var(--sub); margin:-4px 0 8px; line-height:1.5; }
     .install-section { background:#f8fafc; border-radius:10px; padding:12px 14px; margin-bottom:4px; }
     .install-step-title { font-size:0.85rem; font-weight:700; color:var(--text); margin-bottom:6px; }
+    .install-status { border-radius:12px; padding:12px 14px; font-size:.8rem; line-height:1.55; background:#f0f9ff; color:#075985; }
+    .install-status.ready { background:#ecfdf5; color:#047857; }
+    .install-status.installed { background:#f0fdfa; color:#115e59; }
+    .install-status.manual { background:#fff7ed; color:#9a3412; }
+    .install-guide { display:none; }
+    .install-guide.active { display:block; }
+    .install-steps { padding-left:20px; color:var(--sub); font-size:.8rem; line-height:1.7; }
+    .install-steps li::marker { color:var(--primary); font-weight:800; }
+    .equipment-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
+    .equipment-hero-name { font-size:1.25rem; font-weight:800; }
+    .equipment-hero-meta { color:var(--sub); font-size:.82rem; margin-top:5px; line-height:1.5; }
+    .btn-small { width:auto; padding:10px 13px; border-radius:10px; font-size:.82rem; }
+    .quick-actions { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:14px; }
+    .quick-action { border:1px solid var(--border); background:#f8fafc; border-radius:12px; padding:11px 4px; color:var(--text); font-size:.75rem; font-weight:700; cursor:pointer; }
+    .quick-action span { display:block; font-size:1.25rem; margin-bottom:4px; }
+    .equipment-list { display:flex; flex-direction:column; gap:8px; }
+    .equipment-row { border:1px solid var(--border); border-radius:12px; padding:12px; display:flex; justify-content:space-between; gap:10px; align-items:center; }
+    .equipment-row.active { border-color:var(--primary); background:#f0fdfa; }
+    .equipment-row-title { font-weight:800; font-size:.92rem; }
+    .equipment-row-meta { font-size:.75rem; color:var(--sub); margin-top:3px; }
+    .equipment-row-actions { display:flex; gap:5px; }
+    .icon-small { border:none; border-radius:9px; padding:8px; background:#e2e8f0; cursor:pointer; }
+    .danger-small { color:#b91c1c; background:#fee2e2; }
+    .history-filters { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:14px; }
+    .history-list { display:flex; flex-direction:column; gap:10px; }
+    .history-item { background:#fff; border:1px solid var(--border); border-radius:14px; padding:14px; display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; }
+    .history-icon { width:38px; height:38px; border-radius:11px; display:grid; place-items:center; background:#f1f5f9; font-size:1.2rem; }
+    .history-title { font-size:.9rem; font-weight:800; }
+    .history-meta { color:var(--sub); font-size:.76rem; margin-top:4px; line-height:1.4; }
+    .history-value { text-align:right; font-weight:800; font-size:.84rem; }
+    .storage-meter { background:#e2e8f0; height:8px; border-radius:999px; overflow:hidden; margin-top:5px; }
+    .storage-meter > div { height:100%; background:var(--primary); width:0; transition:width .2s; }
+    .trend-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:7px; height:150px; align-items:end; margin-top:8px; }
+    .trend-col { height:100%; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; gap:5px; min-width:0; }
+    .trend-bar-wrap { flex:1; width:100%; display:flex; align-items:flex-end; justify-content:center; }
+    .trend-bar { width:70%; min-height:2px; background:linear-gradient(180deg,var(--primary-light),var(--primary)); border-radius:6px 6px 2px 2px; }
+    .trend-value { font-size:.68rem; font-weight:700; color:var(--primary); }
+    .trend-label { font-size:.68rem; color:var(--sub); }
+    .online-status { font-size:.72rem; font-weight:700; padding:4px 8px; border-radius:999px; background:rgba(255,255,255,.18); white-space:nowrap; }
+    .kpi.complete::before { background:linear-gradient(90deg,#10b981,#6ee7b7); }
+    .kpi.missing::before { background:linear-gradient(90deg,#ef4444,#fca5a5); }
+    .kpi.due::before { background:linear-gradient(90deg,#f59e0b,#fde68a); }
+    .admin-summary-grid { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:16px; }
+    .admin-summary-item { background:#fff; border-radius:14px; padding:14px 10px; box-shadow:0 2px 10px rgba(0,0,0,.05); }
+    .admin-summary-label { color:var(--sub); font-size:.72rem; font-weight:700; }
+    .admin-summary-value { font-size:1.25rem; font-weight:900; margin-top:5px; color:var(--primary); }
+    .admin-alert-list { display:flex; flex-direction:column; gap:8px; }
+    .admin-alert { border-radius:12px; padding:12px; display:flex; gap:10px; align-items:flex-start; background:#fff7ed; color:#9a3412; }
+    .admin-alert.danger { background:#fef2f2; color:#b91c1c; }
+    .admin-alert.info { background:#eff6ff; color:#1d4ed8; }
+    .admin-alert-title { font-weight:800; font-size:.86rem; }
+    .admin-alert-detail { font-size:.76rem; margin-top:3px; line-height:1.4; opacity:.9; }
+    .admin-equipment-list { display:flex; flex-direction:column; gap:10px; }
+    .admin-equipment-card { border:1px solid var(--border); border-radius:14px; padding:14px; background:#fff; }
+    .admin-equipment-head { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; }
+    .admin-equipment-name { font-weight:900; }
+    .admin-equipment-meta { color:var(--sub); font-size:.76rem; margin-top:4px; }
+    .status-badge { padding:4px 9px; border-radius:999px; font-size:.72rem; font-weight:800; white-space:nowrap; }
+    .status-normal { background:#d1fae5; color:#047857; }
+    .status-warning { background:#fef3c7; color:#b45309; }
+    .status-danger { background:#fee2e2; color:#b91c1c; }
+    .status-idle { background:#e2e8f0; color:#475569; }
+    .admin-equipment-metrics { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin:12px 0; }
+    .admin-equipment-metric { background:#f8fafc; border-radius:9px; padding:8px; }
+    .admin-equipment-metric span { display:block; color:var(--sub); font-size:.67rem; }
+    .admin-equipment-metric strong { display:block; margin-top:3px; font-size:.82rem; }
+    .admin-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .admin-history-filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; }
+    .admin-history-filters .wide { grid-column:1/-1; }
+    .submission-card { border:1px solid #bae6fd; background:linear-gradient(145deg,#fff,#f0f9ff); }
+    .submission-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px; }
+    .submission-title { font-size:1rem; font-weight:900; }
+    .submission-description { color:var(--sub); font-size:.76rem; line-height:1.5; margin-top:4px; }
+    .submission-status { padding:5px 10px; border-radius:999px; font-size:.7rem; font-weight:900; white-space:nowrap; }
+    .submission-status.pending { background:#fef3c7; color:#b45309; }
+    .submission-status.changed { background:#fee2e2; color:#b91c1c; }
+    .submission-status.opened { background:#dbeafe; color:#1d4ed8; }
+    .submission-status.copied { background:#e0e7ff; color:#4338ca; }
+    .submission-checklist { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:14px; }
+    .submission-check { background:#fff; border:1px solid var(--border); border-radius:11px; padding:10px; }
+    .submission-check-label { color:var(--sub); font-size:.7rem; font-weight:700; }
+    .submission-check-value { margin-top:4px; font-size:.82rem; font-weight:900; }
+    .submission-check-value.complete { color:#047857; }
+    .submission-check-value.missing { color:#b91c1c; }
+    .submission-actions { display:grid; grid-template-columns:1.4fr 1fr; gap:8px; }
+    .submission-note { color:var(--sub); font-size:.7rem; line-height:1.45; margin-top:10px; }
+    .submission-preview { width:100%; min-height:340px; resize:vertical; border:2px solid var(--border); border-radius:12px; padding:14px; background:#f8fafc; color:var(--text); font-family:inherit; font-size:.82rem; line-height:1.55; outline:none; }
+    .submission-warning { border-radius:10px; padding:10px 12px; background:#fff7ed; color:#9a3412; font-size:.78rem; line-height:1.45; }
+    .submission-warning.ready { background:#ecfdf5; color:#047857; }
+    .plan-summary { border:1px solid #99f6e4; background:linear-gradient(145deg,#f0fdfa,#fff); border-radius:14px; padding:14px; }
+    .plan-summary-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+    .plan-name { font-size:1rem; font-weight:900; color:#115e59; }
+    .plan-description { color:var(--sub); font-size:.75rem; line-height:1.45; margin-top:4px; }
+    .plan-chip { display:inline-flex; align-items:center; border-radius:999px; padding:5px 9px; background:#ccfbf1; color:#0f766e; font-size:.68rem; font-weight:900; white-space:nowrap; }
+    .plan-usage { display:flex; justify-content:space-between; gap:10px; margin-top:12px; color:var(--sub); font-size:.75rem; font-weight:700; }
+    .plan-usage strong { color:var(--primary); }
+    .plan-meter { height:7px; border-radius:999px; background:#ccfbf1; overflow:hidden; margin-top:6px; }
+    .plan-meter > div { height:100%; width:0; background:var(--primary); transition:width .2s; }
+    .plan-detail-button { border:none; background:transparent; color:var(--primary); font-size:.76rem; font-weight:800; padding:10px 0 0; cursor:pointer; }
+    .scope-notice { border:1px solid #bae6fd; background:#f0f9ff; color:#075985; border-radius:12px; padding:12px 14px; margin-bottom:16px; font-size:.78rem; line-height:1.55; }
+    .plan-feature-block { border-radius:12px; padding:13px 14px; background:#f8fafc; }
+    .plan-feature-title { font-size:.84rem; font-weight:900; margin-bottom:7px; }
+    .plan-feature-list { padding-left:19px; color:var(--sub); font-size:.78rem; line-height:1.7; }
+    .plan-feature-list li::marker { color:var(--primary); }
+    .plan-local-warning { border-radius:12px; padding:12px 14px; background:#fff7ed; color:#9a3412; font-size:.76rem; line-height:1.55; }
+    .plan-modal-actions { display:grid; grid-template-columns:1fr; gap:8px; margin-top:2px; }
+    @media (max-width:520px) {
+      .date-pill { padding:6px 9px; }
+      .date-pill input[type="date"] { width:114px; font-size:.82rem; }
+      .app-title { font-size:1.15rem; }
+      .quick-actions { grid-template-columns:repeat(4,1fr); }
+      .input-row { grid-template-columns:1fr; gap:0; }
+      .admin-summary-grid { grid-template-columns:repeat(3,1fr); }
+    }
   </style>
 </head>
 <body>
 
 <div class="app-header">
   <div class="header-row">
-    <div class="app-title" id="app-title">🚜 지게차 관리</div>
+    <div class="app-title" id="app-title">BuildNote</div>
     <div class="header-actions">
       <div class="date-pill">
         <span>📅</span>
         <input type="date" id="dateSelect">
       </div>
-      <button class="icon-btn" onclick="openInstallGuide()" title="앱 설치 방법">📲</button>
+      <button class="icon-btn" id="install-header-button" onclick="openInstallGuide()" title="홈 화면에 앱 설치" aria-label="홈 화면에 앱 설치">📲</button>
       <button class="icon-btn" onclick="openSettings()">⚙️</button>
     </div>
   </div>
-  <div class="day-badge" id="dayBadge">목요일</div>
+  <div class="header-subrow">
+    <select id="equipment-select" class="equipment-select" aria-label="현재 장비"></select>
+    <span class="online-status" id="online-status">온라인</span>
+    <div class="day-badge" id="dayBadge">목요일</div>
+  </div>
+</div>
+
+<div class="mode-switch-bar" role="tablist" aria-label="앱 모드">
+  <button class="mode-button active" data-mode="record" onclick="switchMode('record')">🚜 장비 기록</button>
+  <button class="mode-button" data-mode="admin" onclick="switchMode('admin')">📋 통합관리</button>
 </div>
 
 <div class="tab-bar">
@@ -162,21 +295,29 @@
   <button class="tab" data-tab="work"><span class="tab-icon">📝</span>작업</button>
   <button class="tab" data-tab="fuel"><span class="tab-icon">⛽</span>주유</button>
   <button class="tab" data-tab="maint"><span class="tab-icon">🔧</span>정비</button>
-  <button class="tab" data-tab="trend"><span class="tab-icon">📈</span>추이</button>
+  <button class="tab" data-tab="trend"><span class="tab-icon">📚</span>이력</button>
 </div>
 
-<div class="content">
+<div class="content" id="record-content">
 
   <!-- 요약 탭 -->
   <div class="tab-panel active" id="tab-summary">
     <div class="card">
-      <div class="form-group" style="margin-bottom:14px;">
-        <label class="form-label">장비 이름</label>
-        <div style="display:flex; gap:8px;">
-          <input class="form-input" id="inp-equipment-name-dash" placeholder="예: 1호기 지게차" style="flex:1;">
-          <button class="btn btn-success" style="width:auto; padding:0 18px;" onclick="saveEquipmentName('inp-equipment-name-dash')">저장</button>
+      <div class="equipment-hero">
+        <div>
+          <div class="equipment-hero-name" id="summary-equipment-name">장비를 등록해주세요</div>
+          <div class="equipment-hero-meta" id="summary-equipment-meta">장비 정보가 없습니다.</div>
         </div>
+        <button class="btn btn-primary btn-small" onclick="openEquipmentManager()">장비 관리</button>
       </div>
+      <div class="quick-actions">
+        <button class="quick-action" onclick="switchTab('usage')"><span>⏱️</span>사용</button>
+        <button class="quick-action" onclick="switchTab('work')"><span>📝</span>작업</button>
+        <button class="quick-action" onclick="switchTab('fuel')"><span>⛽</span>주유</button>
+        <button class="quick-action" onclick="switchTab('maint')"><span>🔧</span>정비</button>
+      </div>
+    </div>
+    <div class="card">
       <label class="quick-check-row" for="chk-fuel-quick-summary" style="margin-bottom:0;">
         <input type="checkbox" id="chk-fuel-quick-summary">
         <span>⛽ 오늘 주유함 (상세 없이 체크만)</span>
@@ -195,6 +336,12 @@
         <div class="kpi-unit">km</div>
         <div class="kpi-diff flat" id="kpi-km-diff">- 변동없음</div>
       </div>
+      <div class="kpi work">
+        <div class="kpi-label">당일 작업시간</div>
+        <div class="kpi-value" id="kpi-work">0.0</div>
+        <div class="kpi-unit">시간</div>
+        <div class="kpi-diff flat">작업 기록 기준</div>
+      </div>
       <div class="kpi fuel">
         <div class="kpi-label">당일 주유량</div>
         <div class="kpi-value" id="kpi-fuel">0.0</div>
@@ -207,6 +354,27 @@
         <div class="kpi-unit">건</div>
         <div class="kpi-diff flat" id="kpi-maint-desc">기록 없음</div>
       </div>
+    </div>
+
+    <div class="card submission-card">
+      <div class="submission-head">
+        <div>
+          <div class="submission-title">💬 오늘 기록 제출</div>
+          <div class="submission-description">저장된 기록을 한 건으로 묶어 정해진 양식으로 공유합니다.</div>
+        </div>
+        <span class="submission-status pending" id="submission-status">공유 필요</span>
+      </div>
+      <div class="submission-checklist">
+        <div class="submission-check"><div class="submission-check-label">사용 기록</div><div class="submission-check-value missing" id="submission-usage-state">미입력</div></div>
+        <div class="submission-check"><div class="submission-check-label">작업 기록</div><div class="submission-check-value missing" id="submission-work-state">미입력</div></div>
+        <div class="submission-check"><div class="submission-check-label">주유 기록</div><div class="submission-check-value" id="submission-fuel-state">없음 · 선택</div></div>
+        <div class="submission-check"><div class="submission-check-label">정비 기록</div><div class="submission-check-value" id="submission-maint-state">없음 · 선택</div></div>
+      </div>
+      <div class="submission-actions">
+        <button class="btn btn-primary" onclick="openSubmissionModal()">카카오톡으로 제출</button>
+        <button class="btn btn-plain" style="background:#e2e8f0" onclick="copyDailySubmission()">내용 복사</button>
+      </div>
+      <div class="submission-note" id="submission-note">휴대폰 공유 화면에서 카카오톡과 오픈채팅방을 선택하세요.</div>
     </div>
 
     <div class="card">
@@ -383,34 +551,190 @@
           <input class="form-input" id="inp-maint-cost" type="number" min="0" placeholder="0">
         </div>
       </div>
+      <div class="form-group">
+        <label class="form-label">다음 점검일 (선택)</label>
+        <input class="form-input" id="inp-maint-next-date" type="date">
+      </div>
       <button class="btn btn-warning" id="btn-save-maint">🔧 정비 기록 저장</button>
     </div>
   </div>
 
-  <!-- 추이 탭 -->
+  <!-- 이력 탭 -->
   <div class="tab-panel" id="tab-trend">
     <div class="card">
-      <div class="card-title">📈 최근 7일 운행시간</div>
-      <div class="chart-wrap"><canvas id="chart-hours"></canvas></div>
+      <div class="card-title">📈 최근 7일 사용시간</div>
+      <div class="trend-grid" id="usage-trend"></div>
     </div>
     <div class="card">
-      <div class="card-title">📍 최근 7일 주행거리</div>
-      <div class="chart-wrap"><canvas id="chart-km"></canvas></div>
+      <div class="card-title">📚 장비 기록 이력</div>
+      <div class="history-filters">
+        <select class="form-select" id="history-type">
+          <option value="all">전체 기록</option>
+          <option value="usage">사용</option>
+          <option value="work">작업</option>
+          <option value="fuel">주유</option>
+          <option value="maint">정비</option>
+        </select>
+        <input class="form-input" id="history-month" type="month">
+      </div>
+      <div class="history-list" id="history-list"></div>
     </div>
   </div>
 
 </div>
 
-<!-- 설정(백업/복원) 모달 -->
+<!-- 1.5차 통합관리 모드 -->
+<div class="content hidden" id="admin-content">
+  <div class="card">
+    <div class="equipment-hero">
+      <div>
+        <div class="equipment-hero-name">📋 전체 장비 현황</div>
+        <div class="equipment-hero-meta" id="admin-date-label">선택 날짜 기준 통합 현황</div>
+      </div>
+      <button class="btn btn-primary btn-small" onclick="exportAdminCsv()">CSV 내보내기</button>
+    </div>
+  </div>
+
+  <div class="scope-notice">
+    <strong>현재 통합관리 범위</strong><br>
+    이 화면은 이 휴대폰에 직접 등록한 장비 기록만 모아 보여줍니다. 다른 기사님의 휴대폰 기록은 카카오톡으로 받아 관리자가 수동으로 확인해야 하며, 자동 취합은 향후 팀 기능으로 제공될 예정입니다.
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi hours">
+      <div class="kpi-label">등록 장비</div>
+      <div class="kpi-value" id="admin-total-equipment">0</div>
+      <div class="kpi-unit">대</div>
+      <div class="kpi-diff flat" id="admin-active-equipment">운행 0대</div>
+    </div>
+    <div class="kpi complete">
+      <div class="kpi-label">기록 완료</div>
+      <div class="kpi-value" id="admin-complete-equipment">0</div>
+      <div class="kpi-unit">대</div>
+      <div class="kpi-diff up">사용·작업 기록</div>
+    </div>
+    <div class="kpi missing">
+      <div class="kpi-label">기록 확인 필요</div>
+      <div class="kpi-value" id="admin-missing-equipment">0</div>
+      <div class="kpi-unit">대</div>
+      <div class="kpi-diff down">누락·부분 기록</div>
+    </div>
+    <div class="kpi due">
+      <div class="kpi-label">점검 예정·초과</div>
+      <div class="kpi-value" id="admin-due-equipment">0</div>
+      <div class="kpi-unit">대</div>
+      <div class="kpi-diff flat">7일 이내 포함</div>
+    </div>
+  </div>
+
+  <div class="admin-summary-grid">
+    <div class="admin-summary-item"><div class="admin-summary-label">전체 작업시간</div><div class="admin-summary-value" id="admin-total-work">0.0h</div></div>
+    <div class="admin-summary-item"><div class="admin-summary-label">전체 주유량</div><div class="admin-summary-value" id="admin-total-fuel">0.0L</div></div>
+    <div class="admin-summary-item"><div class="admin-summary-label">전체 정비비</div><div class="admin-summary-value" id="admin-total-maint-cost">0원</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🔔 오늘 확인할 항목</div>
+    <div class="admin-alert-list" id="admin-alert-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">🚜 장비 상태</div>
+    <div class="admin-equipment-list" id="admin-equipment-list"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">📚 전체 장비 이력</div>
+    <div class="admin-history-filters">
+      <select class="form-select" id="admin-history-equipment"><option value="all">전체 장비</option></select>
+      <select class="form-select" id="admin-history-type">
+        <option value="all">전체 기록</option>
+        <option value="usage">사용</option>
+        <option value="work">작업</option>
+        <option value="fuel">주유</option>
+        <option value="maint">정비</option>
+      </select>
+      <input class="form-input wide" id="admin-history-month" type="month">
+    </div>
+    <div class="history-list" id="admin-history-list"></div>
+  </div>
+</div>
+
+<!-- 일일 기록 제출 모달 -->
+<div id="submission-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="card-title" style="margin-bottom:0">💬 오늘 기록 카카오톡 제출</div>
+    <p class="modal-hint">아래 내용은 현재 선택한 장비와 날짜의 저장 기록으로 자동 생성됩니다. 전송 후에는 관리자가 카카오톡에서 수동으로 확인·취합해야 합니다.</p>
+    <div class="submission-warning" id="submission-warning">필수 기록을 확인해주세요.</div>
+    <textarea class="submission-preview" id="submission-preview" readonly aria-label="카카오톡 제출 내용"></textarea>
+    <button class="btn btn-primary" id="submission-share-button" onclick="shareDailySubmission()">카카오톡 공유 열기</button>
+    <button class="btn btn-fuel" onclick="copyDailySubmission()">내용 복사</button>
+    <button class="btn btn-plain" onclick="closeSubmissionModal()">닫기</button>
+  </div>
+</div>
+
+<!-- 설정(장비/백업/복원) 모달 -->
 <div id="settings-modal" class="modal-overlay hidden">
   <div class="modal-card">
-    <div class="card-title" style="margin-bottom:0">⚙️ 장비 / 데이터 관리</div>
-    <div class="form-group" style="margin-bottom:6px;">
-      <label class="form-label">장비 이름</label>
-      <input class="form-input" id="inp-equipment-name" placeholder="예: 1호기 지게차">
+    <div class="card-title" style="margin-bottom:0">⚙️ 장비 및 데이터 관리</div>
+    <div class="plan-summary">
+      <div class="plan-summary-head">
+        <div>
+          <div class="plan-name">BuildNote 무료</div>
+          <div class="plan-description">장비 1대의 기본 기록과 카카오톡 공유</div>
+        </div>
+        <span class="plan-chip">MVP 안내</span>
+      </div>
+      <div class="plan-usage"><span>등록 장비</span><strong id="plan-equipment-count">1대 · 무료 안내 기준 1대</strong></div>
+      <div class="plan-meter"><div id="plan-equipment-bar"></div></div>
+      <button class="plan-detail-button" type="button" onclick="openFreePlanGuide('details')">무료 플랜 자세히 보기 →</button>
     </div>
-    <button class="btn btn-success" onclick="saveEquipmentName()">이름 저장</button>
-    <p class="modal-hint">모든 기록은 이 기기의 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 기록이 사라지니 주기적으로 백업해두세요.</p>
+    <div class="equipment-list" id="equipment-list"></div>
+    <button class="btn btn-success" onclick="showEquipmentForm()">＋ 새 장비 등록</button>
+    <div id="equipment-form" class="install-section hidden">
+      <input type="hidden" id="equipment-edit-id">
+      <div class="form-group">
+        <label class="form-label">장비 이름 *</label>
+        <input class="form-input" id="equipment-name" placeholder="예: 1호기 지게차">
+      </div>
+      <div class="input-row">
+        <div class="form-group">
+          <label class="form-label">장비 분류 *</label>
+          <select class="form-select" id="equipment-category">
+            <option value="지게차">지게차</option>
+            <option value="굴착기">굴착기</option>
+            <option value="크레인">크레인</option>
+            <option value="고소작업차">고소작업차</option>
+            <option value="로더">로더</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">규격</label>
+          <input class="form-input" id="equipment-type" placeholder="예: 5톤, 02">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">장비 번호</label>
+        <input class="form-input" id="equipment-number" placeholder="예: 서울 01가 1234">
+      </div>
+      <div class="form-group">
+        <label class="form-label">운행 상태</label>
+        <select class="form-select" id="equipment-status">
+          <option value="active">운행 중</option>
+          <option value="idle">운휴</option>
+        </select>
+      </div>
+      <div class="input-row">
+        <button class="btn btn-primary" onclick="saveEquipment()">장비 저장</button>
+        <button class="btn btn-plain" onclick="hideEquipmentForm()">취소</button>
+      </div>
+    </div>
+    <p class="modal-hint">기록은 현재 기기에 저장됩니다. 브라우저 데이터를 지우거나 기기를 변경하기 전에 백업 파일을 내려받으세요.</p>
+    <div>
+      <div class="hint" id="storage-text">저장공간 사용량 계산 중</div>
+      <div class="storage-meter"><div id="storage-bar"></div></div>
+    </div>
     <button class="btn btn-primary" onclick="exportBackup()">⬇ 백업 내보내기</button>
     <button class="btn btn-fuel" onclick="document.getElementById('import-file').click()">⬆ 백업 가져오기</button>
     <input type="file" id="import-file" accept="application/json" style="display:none" onchange="importBackup(event)">
@@ -418,22 +742,78 @@
   </div>
 </div>
 
-<!-- 앱 설치 방법 안내 모달 -->
+<!-- 1.6차 무료 플랜 및 로컬 저장 안내 -->
+<div id="free-plan-modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="card-title" style="margin-bottom:0">🌱 BuildNote 무료 플랜</div>
+    <p class="modal-hint" id="free-plan-message">장비 1대의 현장 기록을 간편하게 관리할 수 있습니다.</p>
+
+    <div class="plan-feature-block">
+      <div class="plan-feature-title">현재 무료로 제공</div>
+      <ul class="plan-feature-list">
+        <li>장비 1대 기본 관리</li>
+        <li>사용·작업·주유·정비 기록</li>
+        <li>카카오톡 제출 양식 공유</li>
+        <li>기기 내 저장과 백업·복원</li>
+      </ul>
+    </div>
+
+    <div class="plan-feature-block">
+      <div class="plan-feature-title">향후 확장 기능</div>
+      <ul class="plan-feature-list">
+        <li>여러 장비 및 여러 기기 동기화</li>
+        <li>다른 기사 기록 자동 취합</li>
+        <li>장부·미수금과 고급 보고서</li>
+      </ul>
+    </div>
+
+    <div class="plan-local-warning">
+      <strong>데이터 저장 안내</strong><br>
+      현재 기록은 이 휴대폰의 브라우저에만 저장됩니다. 브라우저 데이터 삭제나 휴대폰 변경 전에 반드시 백업 파일을 내려받으세요.
+    </div>
+
+    <div class="plan-modal-actions">
+      <button class="btn btn-success hidden" id="plan-continue-equipment" type="button" onclick="continueEquipmentRegistration()">MVP 테스트에서 계속 등록</button>
+      <button class="btn btn-primary" type="button" onclick="closeFreePlanGuide()">확인</button>
+    </div>
+    <p class="modal-hint" id="plan-policy-note" style="margin:0">현재 MVP에서는 기능 확인을 위해 여러 장비 등록을 차단하지 않습니다.</p>
+  </div>
+</div>
+
+<!-- 스마트폰 홈 화면 바로가기 설치 모달 -->
 <div id="install-modal" class="modal-overlay hidden">
   <div class="modal-card">
-    <div class="card-title" style="margin-bottom:0">📲 앱 설치 방법</div>
+    <div class="card-title" style="margin-bottom:0">📲 홈 화면에 BuildNote 설치</div>
+    <p class="modal-hint">BuildNote를 스마트폰 홈 화면에 설치하면 일반 앱처럼 바로 실행할 수 있습니다.</p>
 
-    <div class="install-section">
-      <div class="install-step-title">방법 1 · 홈 화면에 추가 (가장 간편)</div>
-      <p class="modal-hint" style="margin:0 0 6px;"><b>Android(Chrome)</b>: 오른쪽 위 메뉴(⋮) → "앱 설치" 또는 "홈 화면에 추가"</p>
-      <p class="modal-hint" style="margin:0;"><b>iPhone(Safari)</b>: 하단 공유 버튼(⬆️) → "홈 화면에 추가"</p>
+    <div class="install-status" id="install-status" role="status">설치 가능 여부를 확인하고 있습니다.</div>
+
+    <button class="btn btn-success" id="install-app-button" type="button" onclick="installAppShortcut()">홈 화면에 앱 설치</button>
+
+    <div class="install-section install-guide" id="install-guide-android">
+      <div class="install-step-title">Android · Chrome에서 수동 설치</div>
+      <ol class="install-steps">
+        <li>Chrome 오른쪽 위 메뉴(⋮)를 누릅니다.</li>
+        <li>‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택합니다.</li>
+        <li>설치를 누르면 홈 화면에 BuildNote가 생깁니다.</li>
+      </ol>
     </div>
 
-    <div class="install-section">
-      <div class="install-step-title">방법 2 · 설치 파일(APK) 만들기</div>
-      <p class="modal-hint" style="margin:0 0 10px;">pwabuilder.com 접속 → 이 사이트 주소 입력 → "Android" 패키지 생성 → 다운로드한 APK를 폰에 설치(출처 불명 앱 설치 허용 필요)</p>
-      <button class="btn btn-fuel" onclick="copySiteUrl()">🔗 이 사이트 주소 복사</button>
+    <div class="install-section install-guide" id="install-guide-ios">
+      <div class="install-step-title">iPhone · Safari에서 설치</div>
+      <ol class="install-steps">
+        <li>이 페이지를 Safari로 엽니다.</li>
+        <li>화면 아래 공유 버튼(□↑)을 누릅니다.</li>
+        <li>‘홈 화면에 추가’ → ‘추가’를 누릅니다.</li>
+      </ol>
     </div>
+
+    <div class="install-section install-guide" id="install-guide-desktop">
+      <div class="install-step-title">설치 버튼이 활성화되지 않을 때</div>
+      <p class="modal-hint" style="margin:0;">주소를 복사해 Android는 Chrome, iPhone은 Safari에서 열어주세요. 설치 기능은 보안 연결(HTTPS)에서 제공됩니다.</p>
+    </div>
+
+    <button class="btn btn-fuel" type="button" onclick="copySiteUrl()">🔗 현재 주소 복사</button>
 
     <button class="btn btn-plain" onclick="closeInstallGuide()">닫기</button>
   </div>
@@ -441,7 +821,7 @@
 
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="text/plain" id="legacy-script">
   const DAYS = ['일요일','월요일','화요일','수요일','목요일','금요일','토요일'];
   const STORAGE_KEY = 'forklift_log_data';
 
@@ -961,5 +1341,6 @@
   updateAppTitle();
   loadSummary();
 </script>
+<script src="/app.js?v=1.3.5"></script>
 </body>
 </html>
