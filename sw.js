@@ -1,16 +1,23 @@
-const CACHE = 'forklift-log-v3';
+const CACHE = 'jangbion-driver-v2';
 const PRECACHE = [
   '/',
+  '/index.html',
+  '/app.js?v=2.0.1',
   '/manifest.json',
   '/static/icon.svg',
   '/static/icons/icon-192.png',
   '/static/icons/icon-512.png',
-  '/static/icons/icon-512-maskable.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js'
+  '/static/icons/icon-512-maskable.png'
 ];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(PRECACHE)));
+  e.waitUntil(
+    caches.open(CACHE).then(async cache => {
+      await Promise.all(PRECACHE.map(async url => {
+        try { await cache.add(url); } catch (error) { console.warn('precache skipped', url, error); }
+      }));
+    })
+  );
   self.skipWaiting();
 });
 
@@ -41,7 +48,7 @@ self.addEventListener('fetch', e => {
     return;
   }
 
-  // 그 외 정적 자원(아이콘, 매니페스트, 라이브러리)은 캐시 우선
+  // 그 외 정적 자원은 캐시 우선
   e.respondWith(
     caches.match(req).then(cached =>
       cached || fetch(req).then(res => {
