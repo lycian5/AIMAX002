@@ -1,4 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#4f46e5"/>
-  <text x="256" y="360" font-size="280" font-weight="bold" fill="#fff" text-anchor="middle" font-family="sans-serif">지</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#fff"/>
+  <path d="M9 36V22C9 13.7 15.7 7 24 7h4v9h-4a6 6 0 0 0-6 6v14H9Zm46 0V22c0-8.3-6.7-15-15-15h-4v9h4a6 6 0 0 1 6 6v14h9Z" fill="#0D1B3D"/>
+  <path d="M24.7 24.8a10.5 10.5 0 1 0 14.6 0" fill="none" stroke="#FF6A00" stroke-width="6.2" stroke-linecap="round"/>
+  <path d="M32 17v11" fill="none" stroke="#FF6A00" stroke-width="6.2" stroke-linecap="round"/>
+  <rect x="8" y="39" width="13" height="18" rx="4" fill="#0D1B3D"/>
+  <path d="M8 45h13M8 51h13" stroke="#fff" stroke-width="2.2"/>
+  <rect x="43" y="39" width="13" height="18" rx="4" fill="#0D1B3D"/>
+  <path d="M43 45h13M43 51h13" stroke="#fff" stroke-width="2.2"/>
+  <path d="M24 41h16v14H24z" fill="#0D1B3D"/>
 </svg>

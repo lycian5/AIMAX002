@@ -3,7 +3,7 @@
 
   const STORAGE_KEY = 'forklift_log_data';
   const PLAN_NOTICE_KEY = 'buildnote_free_plan_notice_v1';
-  const DB_VERSION = 4;
+  const DB_VERSION = 5;
   const MAX_WORK_PHOTOS = 4;
   const APPROX_STORAGE_LIMIT = 5 * 1024 * 1024;
   const DAYS = ['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'];
@@ -78,6 +78,51 @@
       }));
   }
 
+  function normalizeOperations(items, equipmentId) {
+    return (Array.isArray(items) ? items : []).filter(Boolean).map(item => ({
+      id: String(item.id || uid('operation')),
+      equipmentId: String(item.equipmentId || equipmentId),
+      operatorId: String(item.operatorId || 'local-driver'),
+      startedAt: String(item.startedAt || new Date().toISOString()),
+      endedAt: item.endedAt ? String(item.endedAt) : '',
+      startMeterValue: item.startMeterValue == null ? null : numberOr(item.startMeterValue),
+      endMeterValue: item.endMeterValue == null ? null : numberOr(item.endMeterValue),
+      memo: String(item.memo || '').slice(0, 500),
+      status: item.status === 'completed' || item.endedAt ? 'completed' : 'active'
+    }));
+  }
+
+  function normalizeInspections(items, equipmentId) {
+    return (Array.isArray(items) ? items : []).filter(Boolean).map(item => ({
+      id: String(item.id || uid('inspection')),
+      equipmentId: String(item.equipmentId || equipmentId),
+      date: isDateString(item.date) ? item.date : localDateString(new Date(item.completedAt || Date.now())),
+      inspectorId: String(item.inspectorId || 'local-driver'),
+      items: Array.isArray(item.items) ? item.items.map(check => ({ label: String(check.label || ''), status: ['normal', 'caution', 'abnormal'].includes(check.status) ? check.status : 'normal' })) : [],
+      overallStatus: ['normal', 'caution', 'abnormal'].includes(item.overallStatus) ? item.overallStatus : 'normal',
+      memo: String(item.memo || '').slice(0, 800),
+      photo: String(item.photo || ''),
+      completedAt: String(item.completedAt || new Date().toISOString())
+    }));
+  }
+
+  function normalizeFaultReports(items, equipmentId) {
+    return (Array.isArray(items) ? items : []).filter(Boolean).map(item => ({
+      id: String(item.id || uid('fault')),
+      equipmentId: String(item.equipmentId || equipmentId),
+      symptom: String(item.symptom || '').slice(0, 300),
+      severity: ['low', 'medium', 'high', 'critical'].includes(item.severity) ? item.severity : 'medium',
+      operable: item.operable !== false,
+      occurredAt: String(item.occurredAt || new Date().toISOString()),
+      location: String(item.location || '').slice(0, 160),
+      memo: String(item.memo || '').slice(0, 800),
+      photo: String(item.photo || ''),
+      reportedBy: String(item.reportedBy || 'local-driver'),
+      createdAt: String(item.createdAt || new Date().toISOString()),
+      resolvedAt: item.resolvedAt ? String(item.resolvedAt) : ''
+    }));
+  }
+
   function migrateDatabase(source) {
     const raw = source && typeof source === 'object' ? source : {};
     let equipments = Array.isArray(raw.equipments) ? raw.equipments.map(normalizeEquipment) : [];
@@ -93,7 +138,10 @@
       workLogs: normalizeLogs(raw.workLogs, currentEquipmentId),
       fuelLogs: normalizeLogs(raw.fuelLogs, currentEquipmentId),
       maintLogs: normalizeLogs(raw.maintLogs, currentEquipmentId),
-      submissions: normalizeSubmissions(raw.submissions, currentEquipmentId)
+      submissions: normalizeSubmissions(raw.submissions, currentEquipmentId),
+      operationSessions: normalizeOperations(raw.operationSessions, currentEquipmentId),
+      inspections: normalizeInspections(raw.inspections, currentEquipmentId),
+      faultReports: normalizeFaultReports(raw.faultReports, currentEquipmentId)
     };
   }
 
@@ -110,6 +158,9 @@
   let DB = loadDatabase();
   let currentUsagePhoto = null;
   let currentWorkPhotos = [];
+  let currentFuelReceipt = null;
+  let currentInspectionPhoto = null;
+  let currentFaultPhoto = null;
   let toastTimer = null;
   let currentMode = 'record';
   let freePlanGuideSource = 'details';
@@ -127,7 +178,7 @@
       return true;
     } catch (error) {
       console.error(error);
-      showToast(`⚠️ ${failureMessage}`);
+      showToast(failureMessage);
       return false;
     }
   }
@@ -194,6 +245,15 @@
     const online = navigator.onLine;
     $('online-status').textContent = online ? '온라인' : '오프라인';
     $('online-status').style.background = online ? 'rgba(255,255,255,.18)' : 'rgba(245,158,11,.85)';
+    $('offline-banner')?.classList.toggle('show', !online);
+  }
+
+  function setBrandTitle(suffix = '') {
+    const title = $('app-title');
+    const main = document.createElement('span'); main.className = 'brand-title-main'; main.textContent = '장비';
+    const on = document.createElement('span'); on.className = 'brand-title-on'; on.textContent = '온';
+    title.replaceChildren(main, on);
+    if (suffix) { const extra = document.createElement('span'); extra.className = 'brand-title-suffix'; extra.textContent = suffix; title.append(extra); }
   }
 
   function switchMode(mode) {
@@ -204,10 +264,10 @@
     document.querySelector('.tab-bar').classList.toggle('hidden', currentMode !== 'record');
     $('equipment-select').disabled = currentMode === 'admin';
     $('equipment-select').style.opacity = currentMode === 'admin' ? '.65' : '1';
-    $('app-title').textContent = currentMode === 'admin' ? 'BuildNote 통합관리' : 'BuildNote';
+    setBrandTitle(currentMode === 'admin' ? '통합관리' : '');
     if (currentMode === 'admin') {
       loadAdminDashboard();
-      document.title = '통합관리 | BuildNote';
+      document.title = '통합관리 | 장비온';
     } else {
       updateEquipmentUI();
       refreshActiveTab();
@@ -245,8 +305,8 @@
     $('summary-equipment-name').textContent = equipment.name;
     const meta = [equipment.category, equipment.type, equipment.number].filter(Boolean);
     $('summary-equipment-meta').textContent = meta.length ? meta.join(' · ') : '상세 정보를 등록해주세요.';
-    $('app-title').textContent = 'BuildNote';
-    document.title = `${equipment.name} | BuildNote`;
+    setBrandTitle();
+    document.title = `${equipment.name} | 장비온`;
   }
 
   function setTrend(elementId, difference, unit) {
@@ -317,7 +377,7 @@
     const usageHoursText = !data.usageRecord ? '미입력' : data.usage.baseline ? `${formatNumber(data.usage.hours, 1)}h` : '기준값 없음';
     const usageDistanceText = !data.usageRecord ? '미입력' : data.usage.baseline ? `${formatNumber(data.usage.km, 1)}km` : '기준값 없음';
     const lines = [
-      '[BuildNote 장비기록]',
+      '[장비온 장비기록]',
       '',
       `기록번호: ${displayCode}`,
       `날짜: ${data.date}`,
@@ -339,7 +399,7 @@
       '■ 정비',
       maintenanceText,
       '',
-      'BuildNote에서 작성된 기록입니다.'
+      '장비온에서 작성된 기록입니다.'
     ];
     return { ...data, existing, baseCode, revision, displayCode, text: lines.join('\n') };
   }
@@ -429,13 +489,13 @@
     if (!await writeClipboardText(submission.text)) {
       const preview = $('submission-preview');
       if (!$('submission-modal').classList.contains('hidden')) { preview.focus(); preview.select(); }
-      showToast('⚠️ 내용을 복사하지 못했습니다. 미리보기에서 직접 복사해주세요.');
+      showToast('내용을 복사하지 못했습니다. 미리보기에서 직접 복사해주세요.');
       return false;
     }
     if (markSubmissionAction(submission, 'copy')) {
       renderSubmissionCard();
       $('submission-preview').value = prepareDailySubmission().text;
-      showToast('📋 제출 내용을 복사했습니다. 카카오톡에 붙여넣으세요.');
+      showToast('제출 내용을 복사했습니다. 카카오톡에 붙여넣으세요.');
       return true;
     }
     return false;
@@ -445,18 +505,18 @@
     const submission = prepareDailySubmission();
     if (!navigator.share) {
       await copyDailySubmission();
-      showToast('📋 이 기기는 공유 화면을 지원하지 않아 내용을 복사했습니다.');
+      showToast('이 기기는 공유 화면을 지원하지 않아 내용을 복사했습니다.');
       return;
     }
     try {
-      await navigator.share({ title: 'BuildNote 장비기록', text: submission.text });
+      await navigator.share({ title: '장비온 장비기록', text: submission.text });
       if (markSubmissionAction(submission, 'share')) {
         renderSubmissionCard();
         closeSubmissionModal();
         showToast('💬 공유 화면을 열었습니다. 전송 여부를 확인해주세요.');
       }
     } catch (error) {
-      if (error?.name !== 'AbortError') showToast('⚠️ 공유 화면을 열지 못했습니다. 내용 복사를 이용해주세요.');
+      if (error?.name !== 'AbortError') showToast('공유 화면을 열지 못했습니다. 내용 복사를 이용해주세요.');
     }
   }
 
@@ -488,60 +548,299 @@
     return item;
   }
 
+  function svgIcon(name, className = 'ui-icon') {
+    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    svg.setAttribute('class', className);
+    svg.setAttribute('aria-hidden', 'true');
+    const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+    use.setAttribute('href', `#icon-${name}`);
+    svg.append(use);
+    return svg;
+  }
+
+  function equipmentIconName(category = '') {
+    if (category.includes('굴착')) return 'excavator';
+    if (category.includes('크레인')) return 'crane';
+    if (category.includes('로더')) return 'loader';
+    return 'equipment';
+  }
+
+  function formatTime(iso) {
+    if (!iso) return '-';
+    const date = new Date(iso);
+    return Number.isNaN(date.getTime()) ? '-' : date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+
+  function todayInspection(equipmentId = DB.currentEquipmentId) {
+    const today = localDateString();
+    return DB.inspections.filter(item => item.equipmentId === equipmentId && item.date === today)
+      .sort((a, b) => String(b.completedAt).localeCompare(String(a.completedAt)))[0] || null;
+  }
+
+  function latestUnresolvedFault(equipmentId = DB.currentEquipmentId) {
+    return DB.faultReports.filter(item => item.equipmentId === equipmentId && !item.resolvedAt)
+      .sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)))[0] || null;
+  }
+
+  function blockingFault(equipmentId = DB.currentEquipmentId) {
+    return DB.faultReports.filter(item => item.equipmentId === equipmentId && !item.resolvedAt && (!item.operable || ['high', 'critical'].includes(item.severity)))
+      .sort((a, b) => String(b.occurredAt).localeCompare(String(a.occurredAt)))[0] || null;
+  }
+
+  function inspectionTemplate(category = '') {
+    const common = ['누유 및 외관', '브레이크·조향', '경고등·계기판'];
+    if (category.includes('굴착')) return [...common, '버킷·핀 상태', '트랙 장력', '유압 호스'];
+    if (category.includes('크레인')) return [...common, '와이어로프', '아웃트리거', '안전장치'];
+    if (category.includes('고소')) return [...common, '작업대 난간', '비상하강 장치', '배터리 상태'];
+    if (category.includes('로더')) return [...common, '버킷 상태', '타이어 상태', '유압 장치'];
+    return [...common, '포크·마스트', '타이어 상태', '후진 경보'];
+  }
+
+  function nextMaintenanceSchedule(equipmentId = DB.currentEquipmentId) {
+    return DB.maintLogs.filter(item => item.equipmentId === equipmentId && isDateString(item.nextDate))
+      .sort((a, b) => a.nextDate.localeCompare(b.nextDate))[0] || null;
+  }
+
+  function maintenanceDueText(equipmentId = DB.currentEquipmentId) {
+    const schedule = nextMaintenanceSchedule(equipmentId);
+    if (!schedule) return '등록된 다음 점검 일정이 없습니다.';
+    const days = Math.ceil((new Date(`${schedule.nextDate}T00:00:00`) - new Date(`${localDateString()}T00:00:00`)) / 86400000);
+    if (days < 0) return `${schedule.type || '정기점검'} 기한이 ${Math.abs(days)}일 지났습니다.`;
+    if (days === 0) return `${schedule.type || '정기점검'} 예정일이 오늘입니다.`;
+    return `${schedule.type || '정기점검'}까지 ${days}일 남았습니다.`;
+  }
+
+  function driverState() {
+    const equipment = currentEquipment();
+    const fault = blockingFault();
+    const date = selectedDate();
+    const today = date === localDateString();
+    const selectedRecord = equipmentLogs(DB.dailyLogs).find(item => item.date === date);
+    if (equipment.status === 'idle') return { key: 'restricted', badge: '운행 제한', title: '현재 운휴 상태입니다.', detail: '장비 설정에서 운행 상태를 변경해야 합니다.', action: 'equipment', button: '장비 상태 확인' };
+    if (fault) return { key: 'restricted', badge: '운행 제한', title: '고장 신고로 운행이 제한되었습니다.', detail: fault.symptom || '고장 내용을 확인해주세요.', action: 'fault', button: '고장 내용 확인' };
+    if (selectedRecord) return { key: 'available', badge: today ? '오늘 기록 완료' : '기록 완료', title: `${today ? '오늘' : date} 운행 기록이 저장되었습니다.`, detail: '필요하면 현재 계기값과 메모를 다시 수정할 수 있습니다.', action: 'usage', button: '운행 기록 수정' };
+    return { key: 'inspection', badge: '기록 필요', title: `${today ? '오늘' : date} 운행 기록을 입력해주세요.`, detail: '현재 시간계와 거리계를 입력하면 전일 대비 사용량을 자동 계산합니다.', action: 'usage', button: '운행 기록 입력' };
+  }
+
+  function metricDefinitions(equipment, date) {
+    const usage = computeEquipmentUsage(date, equipment.id);
+    const works = logsForEquipment(DB.workLogs, equipment.id).filter(item => item.date === date);
+    const fuels = logsForEquipment(DB.fuelLogs, equipment.id).filter(item => item.date === date);
+    const values = {
+      usage: { label: equipment.category.includes('굴착') || equipment.category.includes('로더') ? '가동시간' : '사용시간', value: usage.hours.toFixed(1), unit: '시간', icon: 'clock' },
+      work: { label: '작업시간', value: works.reduce((sum, item) => sum + numberOr(item.hours), 0).toFixed(1), unit: '시간', icon: 'clipboard' },
+      distance: { label: '주행거리', value: usage.km.toFixed(1), unit: 'km', icon: 'map' },
+      fuel: { label: '주유량', value: fuels.reduce((sum, item) => sum + numberOr(item.liters), 0).toFixed(1), unit: 'L', icon: 'fuel' },
+      count: { label: equipment.category.includes('크레인') ? '인양·작업 건수' : '작업 건수', value: String(works.length), unit: '건', icon: 'list' },
+      inspection: { label: '점검 상태', value: todayInspection(equipment.id) ? '완료' : '미완료', unit: '', icon: 'shield' }
+    };
+    if (equipment.category.includes('지게차')) return [values.usage, values.work, values.distance, values.count];
+    if (equipment.category.includes('크레인')) return [values.usage, values.count, values.fuel, values.inspection];
+    if (equipment.category.includes('고소')) return [values.usage, values.count, values.inspection, values.work];
+    return [values.usage, values.work, values.fuel, values.count];
+  }
+
+  function renderDriverMetrics() {
+    const container = $('driver-metrics');
+    const date = selectedDate();
+    $('driver-metric-date').textContent = date === localDateString() ? '오늘 기준' : `${date} 기준`;
+    container.replaceChildren(...metricDefinitions(currentEquipment(), date).map(metric => {
+      const card = document.createElement('div'); card.className = 'driver-metric';
+      const head = document.createElement('div'); head.className = 'metric-head';
+      const label = document.createElement('span'); label.textContent = metric.label;
+      head.append(label, svgIcon(metric.icon, 'ui-icon small'));
+      const value = document.createElement('div'); value.className = 'metric-value'; value.textContent = metric.value;
+      if (metric.unit) { const unit = document.createElement('span'); unit.className = 'metric-unit'; unit.textContent = metric.unit; value.append(unit); }
+      card.append(head, value); return card;
+    }));
+  }
+
+  function driverActions() {
+    const actions = [];
+    const inspection = todayInspection();
+    const fault = latestUnresolvedFault();
+    const maintenance = nextMaintenanceSchedule();
+    if (!inspection) actions.push({ icon: 'shield', tone: 'warning', title: '일일 안전 점검이 필요합니다', detail: '장비 사용 전 필수 항목을 확인해주세요.', label: '점검하기', action: openInspectionModal });
+    else if (inspection.overallStatus === 'abnormal') actions.push({ icon: 'alert', tone: 'danger', title: '점검 이상 항목이 있습니다', detail: '이상 항목을 조치한 뒤 다시 점검해주세요.', label: '재점검', action: openInspectionModal });
+    if (fault) actions.push({ icon: 'alert', tone: blockingFault() ? 'danger' : 'warning', title: '처리되지 않은 고장 신고가 있습니다', detail: fault.symptom || '고장 신고 내용을 확인해주세요.', label: '확인', action: openFaultModal });
+    if (maintenance?.nextDate) {
+      const days = Math.ceil((new Date(`${maintenance.nextDate}T00:00:00`) - new Date(`${localDateString()}T00:00:00`)) / 86400000);
+      if (days <= 7) actions.push({ icon: 'wrench', tone: days < 0 ? 'danger' : 'warning', title: days < 0 ? '정비 예정일이 지났습니다' : '정비 예정일이 다가옵니다', detail: `${maintenance.type || '정기점검'} · ${maintenance.nextDate}`, label: '정비 기록', action: () => switchTab('maint') });
+    }
+    return actions;
+  }
+
+  function renderDriverActions() {
+    const section = $('driver-alert-section');
+    const container = $('driver-action-list');
+    const actions = driverActions();
+    const notification = $('notification-count');
+    notification.textContent = String(actions.length);
+    notification.classList.toggle('hidden', !actions.length);
+    section.classList.toggle('hidden', !actions.length);
+    container.replaceChildren(...actions.map(item => {
+      const row = document.createElement('div'); row.className = `action-required-item ${item.tone}`;
+      const icon = document.createElement('div'); icon.className = 'activity-icon'; icon.append(svgIcon(item.icon));
+      const copy = document.createElement('div'); copy.className = 'action-required-copy';
+      const title = document.createElement('strong'); title.textContent = item.title;
+      const detail = document.createElement('span'); detail.textContent = item.detail;
+      copy.append(title, detail);
+      const button = document.createElement('button'); button.type = 'button'; button.className = 'action-required-button'; button.textContent = item.label; button.addEventListener('click', item.action);
+      row.append(icon, copy, button); return row;
+    }));
+  }
+
+  function recentActivities() {
+    const equipmentId = DB.currentEquipmentId;
+    const activities = [];
+    logsForEquipment(DB.workLogs, equipmentId).forEach(item => activities.push({ icon: 'clipboard', title: item.project || item.place || '작업 기록', detail: `${item.date} · ${numberOr(item.hours).toFixed(1)}시간`, time: item.updatedAt || item.createdAt }));
+    logsForEquipment(DB.fuelLogs, equipmentId).forEach(item => activities.push({ icon: 'fuel', title: item.quick ? '주유 완료 체크' : '주유 기록', detail: `${item.date}${item.quick ? '' : ` · ${numberOr(item.liters).toFixed(1)}L`}`, time: item.createdAt }));
+    logsForEquipment(DB.maintLogs, equipmentId).forEach(item => activities.push({ icon: 'wrench', title: item.type || '정비 기록', detail: item.date, time: item.createdAt }));
+    DB.inspections.filter(item => item.equipmentId === equipmentId).forEach(item => activities.push({ icon: 'shield', title: '일일 안전 점검', detail: `${item.date} · ${item.overallStatus === 'normal' ? '정상' : '이상 확인'}`, time: item.completedAt }));
+    DB.faultReports.filter(item => item.equipmentId === equipmentId).forEach(item => activities.push({ icon: 'alert', title: '고장 신고', detail: item.symptom || '내용 없음', time: item.occurredAt }));
+    return activities.filter(item => item.time).sort((a, b) => String(b.time).localeCompare(String(a.time))).slice(0, 5);
+  }
+
+  function renderRecentActivities() {
+    const container = $('driver-recent-list');
+    const activities = recentActivities();
+    if (!activities.length) return renderEmpty(container, 'clock', '아직 기록이 없습니다. 빠른 실행으로 첫 기록을 남겨보세요.');
+    container.replaceChildren(...activities.map(item => {
+      const row = document.createElement('div'); row.className = 'recent-activity';
+      const icon = document.createElement('div'); icon.className = 'activity-icon'; icon.append(svgIcon(item.icon));
+      const copy = document.createElement('div');
+      const title = document.createElement('div'); title.className = 'activity-title'; title.textContent = item.title;
+      const detail = document.createElement('div'); detail.className = 'activity-detail'; detail.textContent = item.detail;
+      copy.append(title, detail);
+      const time = document.createElement('time'); time.className = 'activity-time'; time.textContent = formatTime(item.time);
+      row.append(icon, copy, time); return row;
+    }));
+  }
+
   function renderEmpty(container, icon, message) {
     const empty = document.createElement('div');
     empty.className = 'empty';
     const iconElement = document.createElement('div');
     iconElement.className = 'empty-icon';
-    iconElement.textContent = icon;
+    iconElement.append(svgIcon(icon));
     empty.append(iconElement, document.createTextNode(message));
     container.replaceChildren(empty);
   }
 
   function loadSummary() {
     updateEquipmentUI();
+    const equipment = currentEquipment();
+    const state = driverState();
     const date = selectedDate();
     const usage = computeDailyUsage(date);
-    const previous = computeDailyUsage(shiftDate(date, -1));
-    const fuels = equipmentLogs(DB.fuelLogs).filter(item => item.date === date);
-    const maintenances = equipmentLogs(DB.maintLogs).filter(item => item.date === date);
-    const work = equipmentLogs(DB.workLogs).find(item => item.date === date);
-
-    $('kpi-hours').textContent = usage.hours.toFixed(1);
-    $('kpi-km').textContent = usage.km.toFixed(1);
-    if ($('kpi-work')) $('kpi-work').textContent = numberOr(work?.hours).toFixed(1);
-    setTrend('kpi-hours-diff', usage.hours - previous.hours, '시간');
-    setTrend('kpi-km-diff', usage.km - previous.km, 'km');
-    $('kpi-fuel').textContent = fuels.reduce((sum, item) => sum + numberOr(item.liters), 0).toFixed(1);
-    const onlyQuick = fuels.length && fuels.every(item => item.quick);
-    $('kpi-fuel-amt').textContent = !fuels.length ? '기록 없음' : onlyQuick ? '✔ 주유함' : `${formatNumber(fuels.reduce((sum, item) => sum + numberOr(item.amount), 0))}원`;
-    $('kpi-maint').textContent = String(maintenances.length);
-    $('kpi-maint-desc').textContent = maintenances[0]?.type || '기록 없음';
-
-    $('gauge-hour').textContent = usage.hourMeter == null ? '-' : `${formatNumber(usage.hourMeter)} h`;
-    $('gauge-odo').textContent = usage.odometer == null ? '-' : `${formatNumber(usage.odometer)} km`;
-    $('gauge-prev-hour').textContent = usage.baseline ? `${formatNumber(usage.baseline.hourMeter)} h` : '-';
-    $('gauge-prev-odo').textContent = usage.baseline ? `${formatNumber(usage.baseline.odometer)} km` : '-';
-    const usageRecord = equipmentLogs(DB.dailyLogs).find(item => item.date === date);
-    $('gauge-memo').textContent = usageRecord?.memo || '-';
-
-    const maintenanceContainer = $('summary-maint-list');
-    if (!maintenances.length) renderEmpty(maintenanceContainer, '🔧', '정비 기록이 없습니다.');
-    else maintenanceContainer.replaceChildren(...maintenances.map(item => recordListItem({
-      badge: item.type || '정비', badgeClass: 'badge-maint',
-      detail: [item.detail, item.manager, item.nextDate ? `다음 ${item.nextDate}` : ''].filter(Boolean).join(' · '),
-      value: `${formatNumber(item.cost)}원`
-    })));
-
-    const fuelContainer = $('summary-fuel-list');
-    if (!fuels.length) renderEmpty(fuelContainer, '⛽', '주유 기록이 없습니다.');
-    else fuelContainer.replaceChildren(...fuels.map(item => recordListItem({
-      badge: '주유', badgeClass: 'badge-fuel', detail: item.quick ? '상세 없이 체크' : item.memo,
-      value: item.quick ? '✔ 완료' : `${formatNumber(item.liters, 1)} L`,
-      subvalue: item.quick ? '' : `${formatNumber(item.unitPrice)}원/L`
-    })));
+    const baseline = getBaseline(date);
+    const visual = $('driver-equipment-visual');
+    visual.replaceChildren(svgIcon(equipmentIconName(equipment.category), 'ui-icon large equipment-hero-icon'));
+    $('driver-health-badge').className = `health-badge health-${state.key}`;
+    $('driver-health-badge').textContent = state.badge;
+    $('driver-health-title').textContent = state.title;
+    $('driver-health-detail').textContent = state.detail;
+    $('driver-operation-state').textContent = usage.hourMeter == null ? '미입력' : '입력 완료';
+    $('driver-operation-elapsed').textContent = baseline ? `${formatNumber(baseline.hourMeter)} h` : '기록 없음';
+    $('driver-operation-start').textContent = baseline ? `${formatNumber(baseline.odometer)} km` : '기록 없음';
+    $('driver-maintenance-due').textContent = maintenanceDueText();
+    const operationButton = $('driver-operation-button');
+    operationButton.dataset.action = state.action;
+    operationButton.className = `btn operation-primary ${state.key === 'restricted' ? 'restricted' : ''}`;
+    operationButton.replaceChildren(svgIcon(state.action === 'fault' ? 'alert' : state.action === 'equipment' ? 'settings' : 'gauge'), document.createTextNode(state.button));
+    renderDriverMetrics();
+    renderDriverActions();
+    renderRecentActivities();
     syncFuelQuickUI();
     renderSubmissionCard();
+  }
+
+  function handleOperationPrimaryAction() {
+    const action = $('driver-operation-button').dataset.action;
+    if (action === 'equipment') return openEquipmentManager();
+    if (action === 'fault') return openFaultModal();
+    switchTab('usage');
+  }
+
+  function openInspectionModal() {
+    const equipment = currentEquipment();
+    $('inspection-equipment-label').textContent = `${equipment.name} · ${equipment.category || '장비'} 점검표`;
+    $('inspection-checklist').replaceChildren(...inspectionTemplate(equipment.category).map((label, index) => {
+      const row = document.createElement('div'); row.className = 'checklist-item';
+      const copy = document.createElement('label'); copy.className = 'checklist-label'; copy.setAttribute('for', `inspection-status-${index}`); copy.textContent = label;
+      const select = document.createElement('select'); select.id = `inspection-status-${index}`; select.className = 'form-select inspection-status'; select.dataset.label = label;
+      [['normal', '정상'], ['caution', '주의'], ['abnormal', '이상']].forEach(([value, text]) => { const option = document.createElement('option'); option.value = value; option.textContent = text; select.append(option); });
+      row.append(copy, select); return row;
+    }));
+    $('inspection-memo').value = '';
+    currentInspectionPhoto = null;
+    showPhotoPreview('inspection-photo-preview', 'inspection-photo-img', null);
+    $('inspection-modal').classList.remove('hidden');
+  }
+
+  function closeInspectionModal() { $('inspection-modal').classList.add('hidden'); }
+
+  function saveInspection() {
+    const items = Array.from(document.querySelectorAll('.inspection-status')).map(select => ({ label: select.dataset.label, status: select.value }));
+    if (!items.length) return showToast('점검 항목을 불러오지 못했습니다.');
+    const overallStatus = items.some(item => item.status === 'abnormal') ? 'abnormal' : items.some(item => item.status === 'caution') ? 'caution' : 'normal';
+    const record = { id: uid('inspection'), equipmentId: DB.currentEquipmentId, date: localDateString(), items, overallStatus, memo: $('inspection-memo').value.trim().slice(0, 500), photo: currentInspectionPhoto, completedAt: new Date().toISOString() };
+    if (commit(next => next.inspections.push(record))) {
+      closeInspectionModal();
+      showToast(overallStatus === 'abnormal' ? '이상 항목이 있어 운행이 제한됩니다.' : '일일 안전 점검을 저장했습니다.');
+      loadSummary();
+    }
+  }
+
+  function localDateTimeInput(date = new Date()) {
+    const offset = date.getTimezoneOffset() * 60000;
+    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
+  }
+
+  function openFaultModal() {
+    const latest = latestUnresolvedFault();
+    $('fault-symptom').value = latest?.symptom || '';
+    $('fault-severity').value = latest?.severity || 'medium';
+    $('fault-operable').value = latest ? String(latest.operable) : 'true';
+    $('fault-time').value = latest?.occurredAt ? localDateTimeInput(new Date(latest.occurredAt)) : localDateTimeInput();
+    $('fault-location').value = latest?.location || '';
+    $('fault-memo').value = latest?.memo || '';
+    currentFaultPhoto = latest?.photo || null;
+    showPhotoPreview('fault-photo-preview', 'fault-photo-img', currentFaultPhoto);
+    $('fault-resolve-button').classList.toggle('hidden', !latest);
+    $('fault-modal').classList.remove('hidden');
+  }
+
+  function closeFaultModal() { $('fault-modal').classList.add('hidden'); }
+
+  function saveFaultReport() {
+    const symptom = $('fault-symptom').value.trim();
+    if (!symptom) return showToast('고장 증상을 입력해주세요.');
+    const time = new Date($('fault-time').value || Date.now());
+    const record = { id: uid('fault'), equipmentId: DB.currentEquipmentId, symptom: symptom.slice(0, 200), severity: $('fault-severity').value, operable: $('fault-operable').value === 'true', occurredAt: Number.isNaN(time.getTime()) ? new Date().toISOString() : time.toISOString(), location: $('fault-location').value.trim().slice(0, 120), memo: $('fault-memo').value.trim().slice(0, 800), photo: currentFaultPhoto, resolvedAt: null, createdAt: new Date().toISOString() };
+    if (commit(next => next.faultReports.push(record))) {
+      closeFaultModal(); showToast(!record.operable || ['high', 'critical'].includes(record.severity) ? '고장 신고를 저장하고 운행을 제한했습니다.' : '고장 신고를 저장했습니다.'); loadSummary();
+    }
+  }
+
+  function resolveLatestFault() {
+    const fault = latestUnresolvedFault();
+    if (!fault) return closeFaultModal();
+    if (commit(next => { const target = next.faultReports.find(item => item.id === fault.id); if (target) target.resolvedAt = new Date().toISOString(); })) {
+      closeFaultModal(); showToast('고장 조치 완료로 변경했습니다.'); loadSummary();
+    }
+  }
+
+  function openMoreMenu() { $('more-modal').classList.remove('hidden'); }
+  function closeMoreMenu() { $('more-modal').classList.add('hidden'); }
+
+  function navigateBottom(target) {
+    document.querySelectorAll('[data-bottom-nav]').forEach(button => button.classList.toggle('active', button.dataset.bottomNav === target));
+    if (target === 'home') { switchMode('record'); switchTab('summary'); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+    if (target === 'equipment') openEquipmentManager();
+    if (target === 'records') switchTab('trend');
+    if (target === 'alerts') { switchMode('record'); switchTab('summary'); setTimeout(() => $('driver-alert-section').scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }
+    if (target === 'more') openMoreMenu();
   }
 
   function loadUsageTab() {
@@ -615,7 +914,7 @@
     const hourMeter = Number.parseFloat($('inp-hm').value);
     const odometer = Number.parseFloat($('inp-odo').value);
     if (!Number.isFinite(hourMeter) || !Number.isFinite(odometer) || hourMeter < 0 || odometer < 0) {
-      showToast('⚠️ 시간계와 거리계를 올바르게 입력해주세요.');
+      showToast('시간계와 거리계를 올바르게 입력해주세요.');
       return;
     }
     const baseline = getBaseline(selectedDate());
@@ -634,7 +933,7 @@
       if (index >= 0) next.dailyLogs[index] = record; else next.dailyLogs.push(record);
     });
     if (saved) {
-      showToast('✅ 사용 기록을 저장했습니다.');
+      showToast('사용 기록을 저장했습니다.');
       loadUsageTab();
     }
   }
@@ -663,6 +962,11 @@
 
   function loadWorkTab() {
     const record = equipmentLogs(DB.workLogs).find(item => item.date === selectedDate());
+    $('inp-work-type').value = record?.workType || '일반 작업';
+    $('inp-work-start').value = record?.startTime || '';
+    $('inp-work-end').value = record?.endTime || '';
+    $('inp-work-place').value = record?.place || '';
+    $('inp-work-project').value = record?.project || '';
     $('inp-work-hours').value = record?.hours ?? '';
     $('inp-work-memo').value = record?.memo || '';
     currentWorkPhotos = clone(record?.photos || (record?.photo ? [record.photo] : []));
@@ -670,15 +974,26 @@
   }
 
   function saveWork() {
-    const hours = Number.parseFloat($('inp-work-hours').value);
+    const startTime = $('inp-work-start').value;
+    const endTime = $('inp-work-end').value;
+    let hours = Number.parseFloat($('inp-work-hours').value);
+    if (!Number.isFinite(hours) && startTime && endTime) {
+      const [startHour, startMinute] = startTime.split(':').map(Number);
+      const [endHour, endMinute] = endTime.split(':').map(Number);
+      let minutes = endHour * 60 + endMinute - (startHour * 60 + startMinute);
+      if (minutes < 0) minutes += 1440;
+      hours = Math.round(minutes / 6) / 10;
+    }
     if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
-      showToast('⚠️ 작업시간을 0~24시간 범위로 입력해주세요.');
+      showToast('작업시간을 0~24시간 범위로 입력해주세요.');
       return;
     }
     const date = selectedDate();
     const existing = equipmentLogs(DB.workLogs).find(item => item.date === date);
     const record = {
       id: existing?.id || uid('work'), equipmentId: DB.currentEquipmentId, date, hours,
+      workType: $('inp-work-type').value, startTime, endTime,
+      place: $('inp-work-place').value.trim().slice(0, 120), project: $('inp-work-project').value.trim().slice(0, 120),
       memo: $('inp-work-memo').value.trim().slice(0, 500), photos: currentWorkPhotos.slice(0, MAX_WORK_PHOTOS),
       createdAt: existing?.createdAt || existing?.created_at || new Date().toISOString(), updatedAt: new Date().toISOString()
     };
@@ -686,7 +1001,7 @@
       const index = next.workLogs.findIndex(item => item.id === record.id);
       if (index >= 0) next.workLogs[index] = record; else next.workLogs.push(record);
     });
-    if (saved) showToast('✅ 작업 기록을 저장했습니다.');
+    if (saved) { showToast('작업 기록을 저장했습니다.'); loadSummary(); }
   }
 
   function isFuelQuickChecked() {
@@ -694,13 +1009,13 @@
   }
 
   function setFuelFormDisabled(disabled) {
-    ['inp-liters', 'inp-unit-price', 'inp-fuel-memo', 'btn-save-fuel'].forEach(id => $(id).disabled = disabled);
+    ['inp-liters', 'inp-unit-price', 'inp-fuel-meter', 'inp-fuel-provider', 'inp-fuel-memo', 'btn-fuel-receipt-pick', 'btn-save-fuel'].forEach(id => $(id).disabled = disabled);
     $('btn-save-fuel').style.opacity = disabled ? '.5' : '1';
   }
 
   function syncFuelQuickUI() {
     const checked = isFuelQuickChecked();
-    ['chk-fuel-quick', 'chk-fuel-quick-summary'].forEach(id => $(id).checked = checked);
+    ['chk-fuel-quick', 'chk-fuel-quick-summary'].map($).filter(Boolean).forEach(input => { input.checked = checked; });
     setFuelFormDisabled(checked);
   }
 
@@ -716,12 +1031,15 @@
     if (saved) {
       syncFuelQuickUI();
       loadSummary();
-      showToast(checked ? '⛽ 오늘 주유함으로 기록했습니다.' : '주유 체크를 해제했습니다.');
+      showToast(checked ? '오늘 주유함으로 기록했습니다.' : '주유 체크를 해제했습니다.');
     }
   }
 
   function loadFuelTab() {
     syncFuelQuickUI();
+    const latest = equipmentLogs(DB.fuelLogs).filter(item => item.date === selectedDate() && !item.quick).sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+    currentFuelReceipt = latest?.receipt || null;
+    showPhotoPreview('fuel-receipt-preview', 'fuel-receipt-img', currentFuelReceipt);
     updateFuelPreview();
   }
 
@@ -738,32 +1056,39 @@
     const liters = Number.parseFloat($('inp-liters').value);
     const unitPrice = numberOr($('inp-unit-price').value);
     if (!Number.isFinite(liters) || liters <= 0 || unitPrice < 0) {
-      showToast('⚠️ 주유량을 올바르게 입력해주세요.');
+      showToast('주유량을 올바르게 입력해주세요.');
       return;
     }
     const record = {
       id: uid('fuel'), equipmentId: DB.currentEquipmentId, date: selectedDate(), liters, unitPrice,
-      amount: Math.round(liters * unitPrice), memo: $('inp-fuel-memo').value.trim().slice(0, 300),
+      amount: Math.round(liters * unitPrice), meterValue: $('inp-fuel-meter').value === '' ? null : numberOr($('inp-fuel-meter').value),
+      provider: $('inp-fuel-provider').value.trim().slice(0, 120), receipt: currentFuelReceipt,
+      memo: $('inp-fuel-memo').value.trim().slice(0, 300),
       quick: false, createdAt: new Date().toISOString()
     };
     if (commit(next => next.fuelLogs.push(record))) {
       $('inp-liters').value = '';
       $('inp-unit-price').value = '';
+      $('inp-fuel-meter').value = '';
+      $('inp-fuel-provider').value = '';
       $('inp-fuel-memo').value = '';
+      currentFuelReceipt = null;
+      showPhotoPreview('fuel-receipt-preview', 'fuel-receipt-img', null);
       updateFuelPreview();
-      showToast('⛽ 주유 기록을 저장했습니다.');
+      showToast('주유 기록을 저장했습니다.');
+      loadSummary();
     }
   }
 
   function saveMaintenance() {
     const type = $('inp-maint-type').value;
     if (!type) {
-      showToast('⚠️ 정비 종류를 선택해주세요.');
+      showToast('정비 종류를 선택해주세요.');
       return;
     }
     const cost = numberOr($('inp-maint-cost').value);
     if (cost < 0) {
-      showToast('⚠️ 비용을 올바르게 입력해주세요.');
+      showToast('비용을 올바르게 입력해주세요.');
       return;
     }
     const record = {
@@ -774,7 +1099,7 @@
     };
     if (commit(next => next.maintLogs.push(record))) {
       ['inp-maint-type', 'inp-maint-detail', 'inp-maint-manager', 'inp-maint-cost', 'inp-maint-next-date'].forEach(id => $(id).value = '');
-      showToast('🔧 정비 기록을 저장했습니다.');
+      showToast('정비 기록을 저장했습니다.');
     }
   }
 
@@ -809,11 +1134,11 @@
     const include = date => !month || date.startsWith(month);
     if (type === 'all' || type === 'usage') equipmentLogs(DB.dailyLogs).filter(item => include(item.date)).forEach(item => {
       const usage = computeDailyUsage(item.date);
-      records.push({ type: 'usage', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: '⏱️', title: '사용 기록', detail: item.memo, value: `${usage.hours.toFixed(1)}h · ${usage.km.toFixed(1)}km` });
+      records.push({ type: 'usage', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: 'gauge', title: '사용 기록', detail: item.memo, value: `${usage.hours.toFixed(1)}h · ${usage.km.toFixed(1)}km` });
     });
-    if (type === 'all' || type === 'work') equipmentLogs(DB.workLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'work', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: '📝', title: '작업 기록', detail: item.memo, value: `${numberOr(item.hours).toFixed(1)}h` }));
-    if (type === 'all' || type === 'fuel') equipmentLogs(DB.fuelLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'fuel', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: '⛽', title: '주유 기록', detail: item.quick ? '상세 없이 체크' : item.memo, value: item.quick ? '완료' : `${numberOr(item.liters).toFixed(1)}L` }));
-    if (type === 'all' || type === 'maint') equipmentLogs(DB.maintLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'maint', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: '🔧', title: item.type || '정비 기록', detail: item.detail, value: `${formatNumber(item.cost)}원` }));
+    if (type === 'all' || type === 'work') equipmentLogs(DB.workLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'work', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: 'clipboard', title: '작업 기록', detail: item.memo, value: `${numberOr(item.hours).toFixed(1)}h` }));
+    if (type === 'all' || type === 'fuel') equipmentLogs(DB.fuelLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'fuel', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: 'fuel', title: '주유 기록', detail: item.quick ? '상세 없이 체크' : item.memo, value: item.quick ? '완료' : `${numberOr(item.liters).toFixed(1)}L` }));
+    if (type === 'all' || type === 'maint') equipmentLogs(DB.maintLogs).filter(item => include(item.date)).forEach(item => records.push({ type: 'maint', id: item.id, date: item.date, createdAt: item.createdAt || item.created_at, icon: 'wrench', title: item.type || '정비 기록', detail: item.detail, value: `${formatNumber(item.cost)}원` }));
     return records.sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || '')));
   }
 
@@ -822,7 +1147,7 @@
     const records = historyRecords();
     const container = $('history-list');
     if (!records.length) {
-      renderEmpty(container, '📚', '조건에 맞는 기록이 없습니다.');
+      renderEmpty(container, 'list', '조건에 맞는 기록이 없습니다.');
       return;
     }
     container.replaceChildren(...records.map(record => {
@@ -830,7 +1155,7 @@
       item.className = 'history-item';
       const icon = document.createElement('div');
       icon.className = 'history-icon';
-      icon.textContent = record.icon;
+      icon.append(svgIcon(record.icon));
       const content = document.createElement('div');
       const title = document.createElement('div');
       title.className = 'history-title';
@@ -948,19 +1273,19 @@
       const equipment = equipmentMap.get(item.equipmentId);
       if (!equipment) return;
       const usage = computeEquipmentUsage(item.date, item.equipmentId);
-      records.push({ type: 'usage', date: item.date, equipment, icon: '⏱️', title: '사용', detail: item.memo || '메모 없음', value: `${usage.hours.toFixed(1)}h · ${usage.km.toFixed(1)}km`, createdAt: item.createdAt || item.created_at });
+      records.push({ type: 'usage', date: item.date, equipment, icon: 'gauge', title: '사용', detail: item.memo || '메모 없음', value: `${usage.hours.toFixed(1)}h · ${usage.km.toFixed(1)}km`, createdAt: item.createdAt || item.created_at });
     });
     if (type === 'all' || type === 'work') DB.workLogs.filter(allowed).forEach(item => {
       const equipment = equipmentMap.get(item.equipmentId); if (!equipment) return;
-      records.push({ type: 'work', date: item.date, equipment, icon: '📝', title: '작업', detail: item.memo || '메모 없음', value: `${numberOr(item.hours).toFixed(1)}h`, createdAt: item.createdAt || item.created_at });
+      records.push({ type: 'work', date: item.date, equipment, icon: 'clipboard', title: '작업', detail: item.memo || '메모 없음', value: `${numberOr(item.hours).toFixed(1)}h`, createdAt: item.createdAt || item.created_at });
     });
     if (type === 'all' || type === 'fuel') DB.fuelLogs.filter(allowed).forEach(item => {
       const equipment = equipmentMap.get(item.equipmentId); if (!equipment) return;
-      records.push({ type: 'fuel', date: item.date, equipment, icon: '⛽', title: '주유', detail: item.quick ? '상세 없이 체크' : item.memo || '메모 없음', value: item.quick ? '완료' : `${numberOr(item.liters).toFixed(1)}L`, createdAt: item.createdAt || item.created_at });
+      records.push({ type: 'fuel', date: item.date, equipment, icon: 'fuel', title: '주유', detail: item.quick ? '상세 없이 체크' : item.memo || '메모 없음', value: item.quick ? '완료' : `${numberOr(item.liters).toFixed(1)}L`, createdAt: item.createdAt || item.created_at });
     });
     if (type === 'all' || type === 'maint') DB.maintLogs.filter(allowed).forEach(item => {
       const equipment = equipmentMap.get(item.equipmentId); if (!equipment) return;
-      records.push({ type: 'maint', date: item.date, equipment, icon: '🔧', title: item.type || '정비', detail: item.detail || '상세 없음', value: `${formatNumber(item.cost)}원`, createdAt: item.createdAt || item.created_at });
+      records.push({ type: 'maint', date: item.date, equipment, icon: 'wrench', title: item.type || '정비', detail: item.detail || '상세 없음', value: `${formatNumber(item.cost)}원`, createdAt: item.createdAt || item.created_at });
     });
     return records.sort((a, b) => b.date.localeCompare(a.date) || String(b.createdAt || '').localeCompare(String(a.createdAt || ''))).slice(0, 100);
   }
@@ -969,7 +1294,7 @@
     const container = $('admin-history-list');
     const records = adminHistoryRecords();
     if (!records.length) {
-      renderEmpty(container, '📚', '조건에 맞는 전체 장비 기록이 없습니다.');
+      renderEmpty(container, 'list', '조건에 맞는 전체 장비 기록이 없습니다.');
       return;
     }
     container.replaceChildren(...records.map(record => {
@@ -977,7 +1302,7 @@
       item.className = 'history-item';
       const icon = document.createElement('div');
       icon.className = 'history-icon';
-      icon.textContent = record.icon;
+      icon.append(svgIcon(record.icon));
       const content = document.createElement('div');
       const title = document.createElement('div');
       title.className = 'history-title';
@@ -998,16 +1323,16 @@
     const alerts = [];
     snapshots.forEach(snapshot => {
       if (snapshot.equipment.status === 'idle') return;
-      if (snapshot.dueDays != null && snapshot.dueDays < 0) alerts.push({ level: 'danger', icon: '🚨', title: `${snapshot.equipment.name} 점검일 초과`, detail: `${snapshot.schedule.nextDate} 기준 ${Math.abs(snapshot.dueDays)}일 지났습니다.` });
-      else if (snapshot.dueDays != null && snapshot.dueDays <= 7) alerts.push({ level: '', icon: '🔧', title: `${snapshot.equipment.name} 점검 임박`, detail: `${snapshot.schedule.nextDate} · ${snapshot.dueDays === 0 ? '오늘 점검' : `${snapshot.dueDays}일 남음`}` });
-      if (snapshot.missing) alerts.push({ level: 'danger', icon: '📝', title: `${snapshot.equipment.name} 기록 없음`, detail: `${snapshot.date} 사용 또는 작업 기록을 확인해주세요.` });
-      else if (snapshot.partial) alerts.push({ level: 'info', icon: '📌', title: `${snapshot.equipment.name} 부분 기록`, detail: snapshot.usageRecord ? '작업시간 기록이 없습니다.' : '계기판 사용 기록이 없습니다.' });
+      if (snapshot.dueDays != null && snapshot.dueDays < 0) alerts.push({ level: 'danger', icon: 'alert', title: `${snapshot.equipment.name} 점검일 초과`, detail: `${snapshot.schedule.nextDate} 기준 ${Math.abs(snapshot.dueDays)}일 지났습니다.` });
+      else if (snapshot.dueDays != null && snapshot.dueDays <= 7) alerts.push({ level: '', icon: 'wrench', title: `${snapshot.equipment.name} 점검 임박`, detail: `${snapshot.schedule.nextDate} · ${snapshot.dueDays === 0 ? '오늘 점검' : `${snapshot.dueDays}일 남음`}` });
+      if (snapshot.missing) alerts.push({ level: 'danger', icon: 'clipboard', title: `${snapshot.equipment.name} 기록 없음`, detail: `${snapshot.date} 사용 또는 작업 기록을 확인해주세요.` });
+      else if (snapshot.partial) alerts.push({ level: 'info', icon: 'alert', title: `${snapshot.equipment.name} 부분 기록`, detail: snapshot.usageRecord ? '작업시간 기록이 없습니다.' : '계기판 사용 기록이 없습니다.' });
     });
     const container = $('admin-alert-list');
     if (!alerts.length) {
       const item = document.createElement('div');
       item.className = 'admin-alert info';
-      const icon = document.createElement('span'); icon.textContent = '✅';
+      const icon = document.createElement('span'); icon.append(svgIcon('check'));
       const text = document.createElement('div');
       const title = document.createElement('div'); title.className = 'admin-alert-title'; title.textContent = '확인할 항목이 없습니다.';
       const detail = document.createElement('div'); detail.className = 'admin-alert-detail'; detail.textContent = '모든 운행 장비의 기록과 점검 일정을 확인했습니다.';
@@ -1015,7 +1340,7 @@
     }
     container.replaceChildren(...alerts.map(alert => {
       const item = document.createElement('div'); item.className = `admin-alert ${alert.level}`.trim();
-      const icon = document.createElement('span'); icon.textContent = alert.icon;
+      const icon = document.createElement('span'); icon.append(svgIcon(alert.icon));
       const text = document.createElement('div');
       const title = document.createElement('div'); title.className = 'admin-alert-title'; title.textContent = alert.title;
       const detail = document.createElement('div'); detail.className = 'admin-alert-detail'; detail.textContent = alert.detail;
@@ -1059,8 +1384,8 @@
   }
 
   function loadAdminDashboard() {
-    $('app-title').textContent = 'BuildNote 통합관리';
-    document.title = '통합관리 | BuildNote';
+    setBrandTitle('통합관리');
+    document.title = '통합관리 | 장비온';
     const snapshots = adminSnapshots();
     const active = snapshots.filter(item => item.equipment.status === 'active');
     const complete = active.filter(item => item.complete);
@@ -1097,9 +1422,9 @@
     rows.splice(1, rows.length - 1, ...rows.slice(1).sort((a, b) => String(b[0]).localeCompare(String(a[0]))));
     const blob = new Blob([`\uFEFF${rows.map(row => row.map(csvCell).join(',')).join('\r\n')}`], { type: 'text/csv;charset=utf-8' });
     const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `BuildNote_통합관리_${localDateString()}.csv`;
+    const anchor = document.createElement('a'); anchor.href = url; anchor.download = `장비온_통합관리_${localDateString()}.csv`;
     document.body.append(anchor); anchor.click(); anchor.remove(); URL.revokeObjectURL(url);
-    showToast('📊 전체 장비 CSV를 저장했습니다.');
+    showToast('전체 장비 CSV를 저장했습니다.');
   }
 
   function renderEquipmentList() {
@@ -1152,7 +1477,7 @@
   }
 
   function hasRecordsForEquipment(equipmentId) {
-    return ['dailyLogs', 'workLogs', 'fuelLogs', 'maintLogs'].some(key => DB[key].some(item => item.equipmentId === equipmentId));
+    return ['dailyLogs', 'workLogs', 'fuelLogs', 'maintLogs', 'submissions', 'operationSessions', 'inspections', 'faultReports'].some(key => DB[key].some(item => item.equipmentId === equipmentId));
   }
 
   function isUnusedStarterEquipment() {
@@ -1186,7 +1511,7 @@
     const id = $('equipment-edit-id').value;
     const name = $('equipment-name').value.trim();
     if (!name) {
-      showToast('⚠️ 장비 이름을 입력해주세요.');
+      showToast('장비 이름을 입력해주세요.');
       return;
     }
     const equipment = normalizeEquipment({
@@ -1229,14 +1554,14 @@
 
   function deleteEquipment(id) {
     if (DB.equipments.length <= 1) {
-      showToast('⚠️ 장비는 최소 1대가 필요합니다.');
+      showToast('장비는 최소 1대가 필요합니다.');
       return;
     }
     const equipment = DB.equipments.find(item => item.id === id);
     if (!equipment || !confirm(`‘${equipment.name}’과 연결된 모든 기록을 삭제할까요?`)) return;
     if (commit(next => {
       next.equipments = next.equipments.filter(item => item.id !== id);
-      ['dailyLogs', 'workLogs', 'fuelLogs', 'maintLogs', 'submissions'].forEach(key => {
+      ['dailyLogs', 'workLogs', 'fuelLogs', 'maintLogs', 'submissions', 'operationSessions', 'inspections', 'faultReports'].forEach(key => {
         next[key] = next[key].filter(item => item.equipmentId !== id);
       });
       if (next.currentEquipmentId === id) next.currentEquipmentId = next.equipments[0].id;
@@ -1299,12 +1624,12 @@
   }
 
   function exportBackup() {
-    const payload = { ...DB, exportedAt: new Date().toISOString(), app: 'BuildNote' };
+    const payload = { ...DB, exportedAt: new Date().toISOString(), app: '장비온' };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `BuildNote_backup_${localDateString()}.json`;
+    anchor.download = `장비온_backup_${localDateString()}.json`;
     document.body.append(anchor);
     anchor.click();
     anchor.remove();
@@ -1317,11 +1642,11 @@
     event.target.value = '';
     if (!file) return;
     if (file.size > 20 * 1024 * 1024) {
-      showToast('⚠️ 백업 파일이 너무 큽니다.');
+      showToast('백업 파일이 너무 큽니다.');
       return;
     }
     const reader = new FileReader();
-    reader.onerror = () => showToast('⚠️ 백업 파일을 읽지 못했습니다.');
+    reader.onerror = () => showToast('백업 파일을 읽지 못했습니다.');
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result));
@@ -1338,7 +1663,7 @@
         refreshActiveTab();
         showToast('⬆ 백업 데이터를 복원했습니다.');
       } catch (error) {
-        showToast('⚠️ 올바른 BuildNote 백업 파일이 아닙니다.');
+        showToast('올바른 장비온 백업 파일이 아닙니다.');
       }
     };
     reader.readAsText(file);
@@ -1372,7 +1697,7 @@
     headerButton.classList.toggle('install-icon-ready', Boolean(deferredInstallPrompt) && !installed);
     if (installed) {
       status.classList.add('installed');
-      status.textContent = 'BuildNote가 홈 화면 앱으로 설치되어 있습니다.';
+      status.textContent = '장비온이 홈 화면 앱으로 설치되어 있습니다.';
       button.textContent = '✓ 홈 화면에 설치됨';
       button.disabled = true;
       return;
@@ -1423,7 +1748,7 @@
       await promptEvent.prompt();
       const choice = await promptEvent.userChoice;
       if (choice?.outcome === 'accepted') {
-        showToast('📲 BuildNote 설치를 시작했습니다.');
+        showToast('장비온 설치를 시작했습니다.');
       } else {
         showToast('설치를 취소했습니다. 언제든 다시 설치할 수 있습니다.');
       }
@@ -1445,7 +1770,7 @@
       deferredInstallPrompt = null;
       updateInstallUI();
       closeInstallGuide();
-      showToast('✓ BuildNote가 홈 화면에 설치되었습니다.');
+      showToast('장비온이 홈 화면에 설치되었습니다.');
     });
     window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', updateInstallUI);
   }
@@ -1455,7 +1780,7 @@
       showToast(`주소: ${url}`);
       return;
     }
-    navigator.clipboard.writeText(url).then(() => showToast('🔗 주소를 복사했습니다.')).catch(() => showToast(`주소: ${url}`));
+    navigator.clipboard.writeText(url).then(() => showToast('주소를 복사했습니다.')).catch(() => showToast(`주소: ${url}`));
   }
 
   function bindEvents() {
@@ -1476,7 +1801,7 @@
       try {
         currentUsagePhoto = await compressImage(file);
         showPhotoPreview('usage-photo-preview', 'usage-photo-img', currentUsagePhoto);
-      } catch (error) { showToast(`⚠️ ${error.message}`); }
+      } catch (error) { showToast(error.message); }
     });
     $('btn-usage-photo-remove').addEventListener('click', () => {
       currentUsagePhoto = null;
@@ -1487,26 +1812,39 @@
       const files = Array.from(event.target.files || []);
       event.target.value = '';
       const room = MAX_WORK_PHOTOS - currentWorkPhotos.length;
-      if (room <= 0) return showToast(`⚠️ 작업 사진은 최대 ${MAX_WORK_PHOTOS}장입니다.`);
+      if (room <= 0) return showToast(`작업 사진은 최대 ${MAX_WORK_PHOTOS}장입니다.`);
       for (const file of files.slice(0, room)) {
         try { currentWorkPhotos.push(await compressImage(file)); }
-        catch (error) { showToast(`⚠️ ${error.message}`); }
+        catch (error) { showToast(error.message); }
       }
       renderWorkPhotoGrid();
     });
     $('btn-save-work').addEventListener('click', saveWork);
-    ['chk-fuel-quick', 'chk-fuel-quick-summary'].forEach(id => $(id).addEventListener('change', event => toggleFuelQuick(event.target.checked)));
+    ['chk-fuel-quick', 'chk-fuel-quick-summary'].map($).filter(Boolean).forEach(input => input.addEventListener('change', event => toggleFuelQuick(event.target.checked)));
     $('inp-liters').addEventListener('input', updateFuelPreview);
     $('inp-unit-price').addEventListener('input', updateFuelPreview);
     $('btn-save-fuel').addEventListener('click', saveFuel);
+    const bindSinglePhoto = (inputId, pickId, removeId, previewId, imageId, setValue) => {
+      $(pickId).addEventListener('click', () => $(inputId).click());
+      $(inputId).addEventListener('change', async event => {
+        const file = event.target.files?.[0]; event.target.value = '';
+        if (!file) return;
+        try { const data = await compressImage(file); setValue(data); showPhotoPreview(previewId, imageId, data); }
+        catch (error) { showToast(error.message); }
+      });
+      $(removeId).addEventListener('click', () => { setValue(null); showPhotoPreview(previewId, imageId, null); });
+    };
+    bindSinglePhoto('inp-fuel-receipt', 'btn-fuel-receipt-pick', 'btn-fuel-receipt-remove', 'fuel-receipt-preview', 'fuel-receipt-img', value => { currentFuelReceipt = value; });
+    bindSinglePhoto('inp-inspection-photo', 'btn-inspection-photo-pick', 'btn-inspection-photo-remove', 'inspection-photo-preview', 'inspection-photo-img', value => { currentInspectionPhoto = value; });
+    bindSinglePhoto('inp-fault-photo', 'btn-fault-photo-pick', 'btn-fault-photo-remove', 'fault-photo-preview', 'fault-photo-img', value => { currentFaultPhoto = value; });
     $('btn-save-maint').addEventListener('click', saveMaintenance);
     $('history-type').addEventListener('change', loadHistoryTab);
     $('history-month').addEventListener('change', loadHistoryTab);
     $('admin-history-equipment').addEventListener('change', renderAdminHistory);
     $('admin-history-type').addEventListener('change', renderAdminHistory);
     $('admin-history-month').addEventListener('change', renderAdminHistory);
-    window.addEventListener('online', updateOnlineStatus);
-    window.addEventListener('offline', updateOnlineStatus);
+    window.addEventListener('online', () => { updateOnlineStatus(); if (currentMode === 'record') loadSummary(); });
+    window.addEventListener('offline', () => { updateOnlineStatus(); if (currentMode === 'record') loadSummary(); });
     document.querySelectorAll('.modal-overlay').forEach(modal => modal.addEventListener('click', event => {
       if (event.target === modal) modal.classList.add('hidden');
     }));
@@ -1537,6 +1875,9 @@
     openFreePlanGuide, closeFreePlanGuide, continueEquipmentRegistration,
     openEquipmentFromAdmin, exportAdminCsv,
     openSubmissionModal, closeSubmissionModal, copyDailySubmission, shareDailySubmission
+    , handleOperationPrimaryAction
+    , openInspectionModal, closeInspectionModal, saveInspection, openFaultModal, closeFaultModal, saveFaultReport, resolveLatestFault
+    , navigateBottom, openMoreMenu, closeMoreMenu
   });
 
   initialize();

@@ -1,8 +1,8 @@
-const CACHE = 'buildnote-mvp-v12';
+const CACHE = 'jangbion-driver-v2';
 const PRECACHE = [
   '/',
   '/index.html',
-  '/app.js?v=1.3.5',
+  '/app.js?v=2.0.1',
   '/manifest.json',
   '/static/icon.svg',
   '/static/icons/icon-192.png',
