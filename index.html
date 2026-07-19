@@ -884,7 +884,7 @@
     <div class="card-title" id="more-title" style="margin-bottom:0"><svg class="ui-icon small" aria-hidden="true"><use href="#icon-more"></use></svg>더보기</div>
     <button class="btn btn-primary" type="button" onclick="closeMoreMenu();switchTab('usage')">계기 기록 입력</button>
     <button class="btn btn-warning" type="button" onclick="closeMoreMenu();switchTab('maint')">정비 기록 입력</button>
-    <button class="btn btn-fuel" id="install-header-button" type="button" onclick="closeMoreMenu();openInstallGuide()">홈 화면에 앱 설치</button>
+    <button class="btn btn-fuel" id="install-header-button" type="button" onclick="closeMoreMenu();openInstallGuide()">장비온 앱 설치</button>
     <button class="btn btn-success" type="button" onclick="closeMoreMenu();openSettings()">장비 및 데이터 설정</button>
     <button class="btn btn-plain" type="button" onclick="closeMoreMenu();switchMode('admin')">통합관리 모드</button>
     <button class="btn btn-plain" type="button" onclick="closeMoreMenu()">닫기</button>
@@ -998,15 +998,15 @@
   </div>
 </div>
 
-<!-- 스마트폰 홈 화면 바로가기 설치 모달 -->
+<!-- 스마트폰 앱 설치 모달 -->
 <div id="install-modal" class="modal-overlay hidden">
   <div class="modal-card">
-    <div class="card-title" style="margin-bottom:0"><svg class="ui-icon small" aria-hidden="true"><use href="#icon-install"></use></svg>홈 화면에 장비온 설치</div>
-    <p class="modal-hint">장비온을 스마트폰 홈 화면에 설치하면 일반 앱처럼 바로 실행할 수 있습니다.</p>
+    <div class="card-title" style="margin-bottom:0"><svg class="ui-icon small" aria-hidden="true"><use href="#icon-install"></use></svg>장비온 앱 설치</div>
+    <p class="modal-hint">Chrome에서 장비온을 앱으로 설치합니다. Galaxy에서는 홈 화면 설정에 따라 앱스 화면에만 표시될 수 있습니다.</p>
 
     <div class="install-status" id="install-status" role="status">설치 가능 여부를 확인하고 있습니다.</div>
 
-    <button class="btn btn-success" id="install-app-button" type="button" onclick="installAppShortcut()">홈 화면에 앱 설치</button>
+    <button class="btn btn-success" id="install-app-button" type="button" onclick="installAppShortcut()">장비온 앱 설치</button>
 
     <div class="install-section install-guide" id="install-guide-kakao">
       <div class="install-step-title">카카오톡에서 Chrome으로 이동</div>
@@ -1020,9 +1020,17 @@
       <div class="install-step-title">Android · Chrome에서 설치</div>
       <ol class="install-steps">
         <li>위 설치 버튼이 활성화될 때까지 잠시 기다립니다.</li>
-        <li><strong>홈 화면에 장비온 설치</strong>를 한 번 누릅니다.</li>
+        <li><strong>장비온 앱 설치</strong>를 한 번 누릅니다.</li>
         <li>Chrome 설치 확인창에서 <strong>설치</strong>를 승인합니다.</li>
       </ol>
+    </div>
+
+    <div class="install-section install-guide" id="install-post-android">
+      <div class="install-step-title">설치 완료 · Galaxy 홈 화면 확인</div>
+      <div class="install-handoff-note">
+        <svg class="ui-icon small" aria-hidden="true"><use href="#icon-install"></use></svg>
+        <span>Samsung Galaxy에서는 설치 앱이 <strong>앱스 화면</strong>에 먼저 등록될 수 있습니다. 홈 화면에 보이지 않으면 홈에서 위로 쓸기 → <strong>장비온 길게 누르기</strong> → <strong>홈 화면에 추가</strong>를 선택하세요. 홈 화면 배치는 휴대폰 런처가 관리하므로 웹에서 자동 실행할 수 없습니다.</span>
+      </div>
     </div>
 
     <div class="install-section install-guide" id="install-guide-ios">
@@ -1575,6 +1583,6 @@
   updateAppTitle();
   loadSummary();
 </script>
-<script src="/app.js?v=2.1.0"></script>
+<script src="/app.js?v=2.1.1"></script>
 </body>
 </html>
