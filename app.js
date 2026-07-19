@@ -1755,21 +1755,24 @@
     ['kakao', 'android', 'ios', 'desktop'].forEach(name => {
       $(`install-guide-${name}`)?.classList.toggle('active', !installed && name === platform && !deferredInstallPrompt);
     });
+    $('install-post-android')?.classList.toggle('active', installed && platform === 'android');
 
     status.className = 'install-status';
     button.classList.remove('install-app-button-ready');
     headerButton.classList.toggle('install-icon-ready', (Boolean(deferredInstallPrompt) || platform === 'kakao') && !installed);
     if (installed) {
       status.classList.add('installed');
-      status.textContent = '장비온이 홈 화면 앱으로 설치되어 있습니다.';
-      button.textContent = '✓ 홈 화면에 설치됨';
+      status.textContent = platform === 'android'
+        ? '장비온 앱 설치가 완료되었습니다. 홈 화면에 보이지 않으면 아래 Galaxy 안내를 확인하세요.'
+        : '장비온 앱 설치가 완료되었습니다.';
+      button.textContent = '✓ 장비온 앱 설치 완료';
       button.disabled = true;
       return;
     }
     if (deferredInstallPrompt) {
       status.classList.add('ready');
-      status.textContent = '설치 준비가 완료되었습니다. 아래 버튼을 한 번 누른 뒤 Chrome 확인창에서 승인하세요.';
-      button.textContent = '홈 화면에 장비온 설치';
+      status.textContent = '설치 준비가 완료되었습니다. 아래 버튼을 한 번 누른 뒤 Chrome 확인창에서 설치를 승인하세요.';
+      button.textContent = '장비온 앱 설치';
       button.disabled = false;
       button.classList.add('install-app-button-ready');
       return;
@@ -1805,7 +1808,7 @@
 
   async function installAppShortcut() {
     if (isStandaloneMode()) {
-      showToast('✓ 이미 홈 화면에 설치되어 있습니다.');
+      showToast('✓ 이미 장비온 앱이 설치되어 있습니다.');
       updateInstallUI();
       return;
     }
@@ -1825,7 +1828,7 @@
       await promptEvent.prompt();
       const choice = await promptEvent.userChoice;
       if (choice?.outcome === 'accepted') {
-        showToast('장비온 설치를 시작했습니다.');
+        showToast('장비온 앱 설치를 시작했습니다.');
       } else {
         showToast('설치를 취소했습니다. 언제든 다시 설치할 수 있습니다.');
       }
@@ -1847,8 +1850,13 @@
       installCompleted = true;
       deferredInstallPrompt = null;
       updateInstallUI();
-      closeInstallGuide();
-      showToast('장비온이 홈 화면에 설치되었습니다.');
+      if (installPlatform() === 'android') {
+        $('install-modal')?.classList.remove('hidden');
+        showToast('장비온 앱 설치 완료. 홈 화면 표시 여부를 확인하세요.');
+      } else {
+        closeInstallGuide();
+        showToast('장비온 앱 설치가 완료되었습니다.');
+      }
     });
     window.matchMedia?.('(display-mode: standalone)').addEventListener?.('change', updateInstallUI);
   }
