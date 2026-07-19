@@ -158,6 +158,9 @@
     .install-guide.active { display:block; }
     .install-steps { padding-left:20px; color:var(--sub); font-size:.8rem; line-height:1.7; }
     .install-steps li::marker { color:var(--primary); font-weight:800; }
+    .install-handoff-note { display:flex; align-items:flex-start; gap:9px; padding:11px 12px; border-radius:11px; background:#eef2ff; color:#1e3a8a; font-size:.78rem; line-height:1.55; }
+    .install-handoff-note .ui-icon { margin-top:1px; }
+    .install-app-button-ready { box-shadow:0 0 0 4px rgba(34,181,115,.16); }
     .equipment-hero { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; }
     .equipment-hero-name { font-size:1.25rem; font-weight:800; }
     .equipment-hero-meta { color:var(--sub); font-size:.82rem; margin-top:5px; line-height:1.5; }
@@ -1005,12 +1008,20 @@
 
     <button class="btn btn-success" id="install-app-button" type="button" onclick="installAppShortcut()">홈 화면에 앱 설치</button>
 
+    <div class="install-section install-guide" id="install-guide-kakao">
+      <div class="install-step-title">카카오톡에서 Chrome으로 이동</div>
+      <div class="install-handoff-note">
+        <svg class="ui-icon small" aria-hidden="true"><use href="#icon-install"></use></svg>
+        <span>Chrome을 자동으로 여는 중입니다. 이동되지 않으면 위의 <strong>Chrome에서 열기</strong> 버튼을 한 번 눌러주세요.</span>
+      </div>
+    </div>
+
     <div class="install-section install-guide" id="install-guide-android">
-      <div class="install-step-title">Android · Chrome에서 수동 설치</div>
+      <div class="install-step-title">Android · Chrome에서 설치</div>
       <ol class="install-steps">
-        <li>Chrome 오른쪽 위 메뉴(⋮)를 누릅니다.</li>
-        <li>‘앱 설치’ 또는 ‘홈 화면에 추가’를 선택합니다.</li>
-        <li>설치를 누르면 홈 화면에 장비온이 생깁니다.</li>
+        <li>위 설치 버튼이 활성화될 때까지 잠시 기다립니다.</li>
+        <li><strong>홈 화면에 장비온 설치</strong>를 한 번 누릅니다.</li>
+        <li>Chrome 설치 확인창에서 <strong>설치</strong>를 승인합니다.</li>
       </ol>
     </div>
 
@@ -1564,6 +1575,6 @@
   updateAppTitle();
   loadSummary();
 </script>
-<script src="/app.js?v=2.0.1"></script>
+<script src="/app.js?v=2.1.0"></script>
 </body>
 </html>

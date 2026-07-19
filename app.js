@@ -166,6 +166,9 @@
   let freePlanGuideSource = 'details';
   let deferredInstallPrompt = null;
   let installCompleted = false;
+  const INSTALL_HANDOFF_PARAM = 'install';
+  const INSTALL_HANDOFF_SOURCE_PARAM = 'from';
+  const KAKAO_HANDOFF_GUARD = 'jangbion:kakao-chrome-handoff';
 
   function commit(mutator, failureMessage = '저장 공간이 부족합니다. 사진을 줄이거나 백업 후 오래된 기록을 정리해주세요.') {
     const next = clone(DB);
@@ -1673,10 +1676,70 @@
     return window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true || installCompleted;
   }
 
+  function isAndroidKakaoBrowser() {
+    const agent = navigator.userAgent || '';
+    return /Android/i.test(agent) && /KAKAOTALK/i.test(agent);
+  }
+
+  function isInstallHandoffEntry() {
+    const params = new URLSearchParams(location.search);
+    return params.get(INSTALL_HANDOFF_PARAM) === '1';
+  }
+
+  function installTargetUrl() {
+    const target = new URL(location.href);
+    target.searchParams.set(INSTALL_HANDOFF_PARAM, '1');
+    target.searchParams.set(INSTALL_HANDOFF_SOURCE_PARAM, 'kakao');
+    target.hash = '';
+    return target;
+  }
+
+  function chromeInstallIntentUrl() {
+    const target = installTargetUrl();
+    const scheme = target.protocol.replace(':', '');
+    const intentPath = `${target.host}${target.pathname}${target.search}`;
+    return `intent://${intentPath}#Intent;scheme=${scheme};package=com.android.chrome;S.browser_fallback_url=${encodeURIComponent(target.toString())};end`;
+  }
+
+  function openInstallModalForHandoff() {
+    updateInstallUI();
+    $('install-modal')?.classList.remove('hidden');
+  }
+
+  function openInChromeForInstall() {
+    if (!isAndroidKakaoBrowser()) {
+      openInstallModalForHandoff();
+      return;
+    }
+    const status = $('install-status');
+    if (status) {
+      status.className = 'install-status ready';
+      status.textContent = 'Chrome으로 이동하고 있습니다. 이동 후 설치 버튼을 한 번 눌러주세요.';
+    }
+    location.href = chromeInstallIntentUrl();
+    setTimeout(openInstallModalForHandoff, 900);
+  }
+
+  function handleInstallHandoff() {
+    if (isStandaloneMode()) return;
+    if (isAndroidKakaoBrowser()) {
+      openInstallModalForHandoff();
+      if (!sessionStorage.getItem(KAKAO_HANDOFF_GUARD)) {
+        sessionStorage.setItem(KAKAO_HANDOFF_GUARD, String(Date.now()));
+        openInChromeForInstall();
+      }
+      return;
+    }
+    if (isInstallHandoffEntry()) {
+      openInstallModalForHandoff();
+    }
+  }
+
   function installPlatform() {
     const agent = navigator.userAgent || '';
     const isIos = /iPad|iPhone|iPod/.test(agent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     if (isIos) return 'ios';
+    if (isAndroidKakaoBrowser()) return 'kakao';
     if (/Android/i.test(agent)) return 'android';
     return 'desktop';
   }
@@ -1689,12 +1752,13 @@
 
     const platform = installPlatform();
     const installed = isStandaloneMode();
-    ['android', 'ios', 'desktop'].forEach(name => {
+    ['kakao', 'android', 'ios', 'desktop'].forEach(name => {
       $(`install-guide-${name}`)?.classList.toggle('active', !installed && name === platform && !deferredInstallPrompt);
     });
 
     status.className = 'install-status';
-    headerButton.classList.toggle('install-icon-ready', Boolean(deferredInstallPrompt) && !installed);
+    button.classList.remove('install-app-button-ready');
+    headerButton.classList.toggle('install-icon-ready', (Boolean(deferredInstallPrompt) || platform === 'kakao') && !installed);
     if (installed) {
       status.classList.add('installed');
       status.textContent = '장비온이 홈 화면 앱으로 설치되어 있습니다.';
@@ -1704,21 +1768,30 @@
     }
     if (deferredInstallPrompt) {
       status.classList.add('ready');
-      status.textContent = '이 스마트폰에 바로 설치할 수 있습니다.';
-      button.textContent = '홈 화면에 앱 설치';
+      status.textContent = '설치 준비가 완료되었습니다. 아래 버튼을 한 번 누른 뒤 Chrome 확인창에서 승인하세요.';
+      button.textContent = '홈 화면에 장비온 설치';
       button.disabled = false;
+      button.classList.add('install-app-button-ready');
       return;
     }
 
     status.classList.add('manual');
-    button.disabled = true;
-    if (platform === 'ios') {
+    if (platform === 'kakao') {
+      status.textContent = 'Chrome으로 자동 이동을 시도합니다. 이동되지 않으면 아래 버튼을 눌러주세요.';
+      button.textContent = 'Chrome에서 열기';
+      button.disabled = false;
+    } else if (platform === 'ios') {
+      button.disabled = true;
       status.textContent = 'iPhone은 Safari의 공유 메뉴에서 홈 화면에 추가할 수 있습니다.';
       button.textContent = '아래 iPhone 설치 방법을 따라주세요';
     } else if (platform === 'android') {
-      status.textContent = '설치 창이 준비되지 않았습니다. Chrome 메뉴에서 홈 화면에 추가해주세요.';
-      button.textContent = '아래 Android 설치 방법을 따라주세요';
+      button.disabled = true;
+      status.textContent = isInstallHandoffEntry()
+        ? 'Chrome에서 설치 준비 중입니다. 설치 버튼이 활성화될 때까지 잠시 기다려주세요.'
+        : '설치 준비 중입니다. 설치 버튼이 활성화될 때까지 잠시 기다려주세요.';
+      button.textContent = '설치 준비 중…';
     } else {
+      button.disabled = true;
       status.textContent = '스마트폰의 Chrome 또는 Safari에서 이 주소를 열어 설치해주세요.';
       button.textContent = '스마트폰에서 설치할 수 있습니다';
     }
@@ -1736,8 +1809,12 @@
       updateInstallUI();
       return;
     }
+    if (isAndroidKakaoBrowser()) {
+      openInChromeForInstall();
+      return;
+    }
     if (!deferredInstallPrompt) {
-      showToast('안내된 브라우저 메뉴에서 홈 화면에 추가해주세요.');
+      showToast('Chrome이 설치 준비 중입니다. 잠시 후 버튼이 활성화됩니다.');
       updateInstallUI();
       return;
     }
@@ -1764,6 +1841,7 @@
       event.preventDefault();
       deferredInstallPrompt = event;
       updateInstallUI();
+      if (isInstallHandoffEntry()) openInstallModalForHandoff();
     });
     window.addEventListener('appinstalled', () => {
       installCompleted = true;
@@ -1864,7 +1942,10 @@
     loadSummary();
     updatePlanSummary();
     updateStorageMeter();
-    if (!localStorage.getItem(PLAN_NOTICE_KEY)) setTimeout(() => openFreePlanGuide('welcome'), 350);
+    handleInstallHandoff();
+    if (!localStorage.getItem(PLAN_NOTICE_KEY) && !isInstallHandoffEntry() && !isAndroidKakaoBrowser()) {
+      setTimeout(() => openFreePlanGuide('welcome'), 350);
+    }
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(error => console.warn('서비스워커 등록 실패', error));
   }
 
